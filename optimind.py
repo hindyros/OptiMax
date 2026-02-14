@@ -107,7 +107,7 @@ def check_gurobipy(code_blocks: list[str]) -> tuple[bool, list[str]]:
     return (len(found) > 0, found)
 
 
-def build_problem_from_optimus_dir(problem_dir: str, run_subdir: str = "output") -> str:
+def build_problem_from_optimus_dir(problem_dir: str, run_subdir: str = "optimus_output") -> str:
     """
     Build a single natural-language problem string from an OptiMUS problem directory,
     so OptiMind can be run on the same instance as OptiMUS for comparison.
@@ -249,8 +249,8 @@ def main() -> None:
     ap.add_argument(
         "--optimus-run-subdir",
         type=str,
-        default="output",
-        help="Subdir under --optimus-dir for data.json and output (default: output).",
+        default="optimus_output",
+        help="Subdir under --optimus-dir for data.json and output (default: optimus_output).",
     )
     args = ap.parse_args()
 
