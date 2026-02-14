@@ -1,26 +1,50 @@
 {
-    "NumberOfItems": {
+    "ProfitA": {
         "shape": [],
-        "definition": "Number of items",
-        "type": "int",
+        "definition": "Profit per unit of product A",
+        "type": "float",
+        "value": 5
+    },
+    "ProfitB": {
+        "shape": [],
+        "definition": "Profit per unit of product B",
+        "type": "float",
         "value": 4
     },
-    "ItemValue": {
-        "shape": ["NumberOfItems"],
-        "definition": "Value of each item",
-        "type": "float",
-        "value": [10, 20, 15, 25]
-    },
-    "ItemWeight": {
-        "shape": ["NumberOfItems"],
-        "definition": "Weight of each item",
-        "type": "float",
-        "value": [2, 4, 3, 5]
-    },
-    "Capacity": {
+    "LaborPerA": {
         "shape": [],
-        "definition": "Maximum total weight we can carry",
+        "definition": "Labor hours required per unit of A",
         "type": "float",
-        "value": 8
+        "value": 2
+    },
+    "MaterialPerA": {
+        "shape": [],
+        "definition": "Raw material required per unit of A",
+        "type": "float",
+        "value": 1
+    },
+    "LaborPerB": {
+        "shape": [],
+        "definition": "Labor hours required per unit of B",
+        "type": "float",
+        "value": 1
+    },
+    "MaterialPerB": {
+        "shape": [],
+        "definition": "Raw material required per unit of B",
+        "type": "float",
+        "value": 2
+    },
+    "TotalLabor": {
+        "shape": [],
+        "definition": "Total available labor hours",
+        "type": "float",
+        "value": 100
+    },
+    "TotalMaterial": {
+        "shape": [],
+        "definition": "Total available raw material",
+        "type": "float",
+        "value": 80
     }
 }

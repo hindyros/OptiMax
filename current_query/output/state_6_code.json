@@ -1,0 +1,84 @@
+{
+    "description": "A factory produces two products A and B. Product A yields $5 profit per unit and product B yields $4 profit per unit. Each unit of A requires 2 hours of labor and 1 unit of raw material. Each unit of B requires 1 hour of labor and 2 units of raw material. The factory has 100 hours of labor and 80 units of raw material available. Maximize total profit.\n",
+    "parameters": {
+        "ProfitA": {
+            "shape": [],
+            "definition": "Profit per unit of product A",
+            "type": "float"
+        },
+        "ProfitB": {
+            "shape": [],
+            "definition": "Profit per unit of product B",
+            "type": "float"
+        },
+        "LaborPerA": {
+            "shape": [],
+            "definition": "Labor hours required per unit of A",
+            "type": "float"
+        },
+        "MaterialPerA": {
+            "shape": [],
+            "definition": "Raw material required per unit of A",
+            "type": "float"
+        },
+        "LaborPerB": {
+            "shape": [],
+            "definition": "Labor hours required per unit of B",
+            "type": "float"
+        },
+        "MaterialPerB": {
+            "shape": [],
+            "definition": "Raw material required per unit of B",
+            "type": "float"
+        },
+        "TotalLabor": {
+            "shape": [],
+            "definition": "Total available labor hours",
+            "type": "float"
+        },
+        "TotalMaterial": {
+            "shape": [],
+            "definition": "Total available raw material",
+            "type": "float"
+        }
+    },
+    "objective": {
+        "description": "\"The goal is to maximize the total profit from producing products A and B in the factory\"",
+        "formulation": "$\\max \\left( \\text{ProfitA} \\cdot \\text{unitsA} + \\text{ProfitB} \\cdot \\text{unitsB} \\right)$",
+        "code": "model.setObjective(5 * unitsA + 4 * unitsB, GRB.MAXIMIZE)"
+    },
+    "constraints": [
+        {
+            "description": "Total labor hours used for products A and B should not exceed the total available labor hours",
+            "formulation": "$2 x_A + x_B \\leq TotalLabor$",
+            "code": "model.addConstr(2 * unitsA + 1 * unitsB <= TotalLabor)"
+        },
+        {
+            "description": "Total raw material used for products A and B should not exceed the total available raw material",
+            "formulation": "$x_A \\\\cdot MaterialPerA + x_B \\\\cdot MaterialPerB \\\\leq TotalMaterial$",
+            "code": "model.addConstr(unitsA * MaterialPerA + unitsB * MaterialPerB <= TotalMaterial)"
+        },
+        {
+            "description": "The number of units produced for product A should be greater than or equal to 0",
+            "formulation": "$unitsA \\\\geq 0$",
+            "code": "model.addConstr(unitsA >= 0)"
+        },
+        {
+            "description": "The number of units produced for product B should be greater than or equal to 0",
+            "formulation": "$unitsB \\\\geq 0$",
+            "code": "model.addConstr(unitsB >= 0)"
+        }
+    ],
+    "variables": {
+        "unitsA": {
+            "shape": [],
+            "type": "continuous",
+            "definition": "The number of units produced for product A"
+        },
+        "unitsB": {
+            "shape": [],
+            "type": "continuous",
+            "definition": "The number of units produced for product B"
+        }
+    }
+}
