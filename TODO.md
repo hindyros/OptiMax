@@ -7,11 +7,11 @@
 
 ## Phase 1 — Get OptiMind Working (Person A, ~3 h)
 
-### 1.1 Provision a GPU Server
-- [ ] Create account on RunPod (or Lambda / Vast.ai)
-- [ ] Deploy a pod: A100 40 GB, PyTorch 2.x template, Ubuntu 22.04
-- [ ] SSH into the pod
-- [ ] Record public IP and exposed port
+### 1.1 Provision a GPU Server (Google Cloud)
+- [ ] Enable billing and install gcloud CLI; request GPU quota if needed (see `docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md`)
+- [ ] Create a GPU VM (A100 40 GB or L4 24 GB) on Compute Engine — use `scripts/setup-optimind-gcp.sh` or follow the doc
+- [ ] SSH into the VM and record the external IP
+- [ ] Open firewall for port 30000 (see doc step 5)
 
 ### 1.2 Install & Launch SGLang + OptiMind
 - [ ] `pip install "sglang[all]>=0.4.5"` + flashinfer wheels
@@ -36,10 +36,9 @@
 - [ ] Test on 2–3 additional problems
 
 ### 1.5 Secure the Connection
-- [ ] Choose method: SSH tunnel / RunPod proxy / nginx
-- [ ] Set up the chosen mechanism
+- [ ] Prefer firewall rule limited to your IP (see `docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md`); or use SSH tunnel / nginx
 - [ ] Verify connection through secure channel
-- [ ] Document connection details for Person B
+- [ ] Document connection details (base URL) for Person B
 
 ---
 

@@ -29,7 +29,7 @@
 └──────────────────────┬──────────────────────────────────┘
                        │  HTTPS (OpenAI-compatible API)
 ┌──────────────────────▼──────────────────────────────────┐
-│        Remote GPU Server (RunPod / Lambda / Vast.ai)     │
+│     Remote GPU Server (Google Cloud / RunPod / etc.)      │
 │                                                          │
 │  SGLang Server + microsoft/OptiMind-SFT                  │
 │  Exposed on port 30000, OpenAI-compatible /v1 endpoint   │
@@ -55,14 +55,14 @@
 
 ### 1.1 Provision a GPU Server (~30 min)
 
-**Recommended:** [RunPod](https://runpod.io) (~$0.50–0.75/hr for an A100 40 GB).
+**Recommended:** [Google Cloud Compute Engine](https://cloud.google.com/compute/docs/gpus) — see **`docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md`** for step-by-step setup.
 
-| Provider | GPU | $/hr | Setup Ease |
-|----------|-----|------|------------|
+| Option | GPU | $/hr (approx) | Setup |
+|--------|-----|----------------|--------|
+| **Google Cloud (A2)** | A100 40 GB | ~$2–3 | `docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md` + `scripts/setup-optimind-gcp.sh` |
+| **Google Cloud (G2)** | L4 24 GB | ~$0.80–1.20 | Same doc; often easier quota |
 | RunPod | A100 40 GB | ~$0.74 | Very easy (templates) |
-| Lambda Cloud | A100 40 GB | ~$1.10 | Easy |
-| Vast.ai | A100 40 GB | ~$0.50 | Medium |
-| Modal | A100 40 GB | ~$0.60 | Easy (serverless) |
+| Lambda / Vast.ai / Modal | A100 40 GB | ~$0.50–1.10 | Alternative providers |
 
 **Minimum specs:**
 - 1× NVIDIA A100 40 GB (OptiMind-SFT is ~14 GB FP16; 24 GB is tight, 40 GB is safe)
@@ -70,9 +70,9 @@
 - Ubuntu 22.04, Python 3.12+
 
 **Steps:**
-- [ ] Create account on RunPod (or chosen provider)
-- [ ] Deploy a pod with the **PyTorch 2.x** template
-- [ ] SSH into the pod and note down the public IP + port
+- [ ] For **Google Cloud**: follow `docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md` (create VM, run `scripts/setup-optimind-gcp.sh` on it, open port 30000)
+- [ ] Or create a GPU pod on RunPod / Lambda / Vast.ai with PyTorch + Ubuntu 22.04
+- [ ] SSH in and note the public IP (and port 30000)
 
 ### 1.2 Install & Launch SGLang + OptiMind (~45 min)
 
@@ -402,7 +402,7 @@ services:
 |-----------|-------|------|
 | Frontend (Next.js) | Vercel (free tier) | $0 |
 | Backend (FastAPI) | Railway / Render / Fly.io | ~$7/mo |
-| GPU Server (OptiMind) | RunPod on-demand or serverless | ~$0.50–0.75/hr |
+| GPU Server (OptiMind) | Google Cloud (A2/L4) or RunPod | ~$0.80–3/hr |
 
 **Gurobi licensing note:** Academic license is node-locked. For cloud deployment, use Gurobi Web License Service (WLS, free for academics) or switch to HiGHS/SCIP.
 
@@ -434,7 +434,7 @@ services:
 | Risk | Likelihood | Mitigation |
 |------|-----------|------------|
 | OptiMind model too large for GPU | Medium | Use A100 40 GB minimum; `--mem-fraction-static 0.85` |
-| SGLang installation issues | Medium | Use RunPod's PyTorch template (CUDA pre-configured) |
+| SGLang installation issues | Medium | Use GCP with `install-nvidia-driver=True` or RunPod's PyTorch template |
 | Gurobi license on remote server | High | Use WLS cloud license, or execute code locally only |
 | OptiMind generates invalid code | Medium | Code validation + fallback to OptiMUS-only mode |
 | HeyGen API latency too high | Low | Make avatar optional; show text immediately |

@@ -85,3 +85,16 @@ from optimus import run_pipeline
 state = run_pipeline("current_query", model="gpt-4o-mini")
 print(state["objective"])
 ```
+
+---
+
+## OptiMind (GPU server)
+
+OptiMind runs via an SGLang server on a machine with an NVIDIA GPU. To use it from this repo you need to:
+
+1. **Provision a GPU VM** — e.g. on **Google Cloud** (recommended): see **[docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md](docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md)** for creating a Compute Engine VM (A100 or L4), installing SGLang, and opening port 30000. A script is provided: `scripts/setup-optimind-gcp.sh`.
+2. **Run the client** from your Mac (or any machine with the repo and network access to the VM):
+
+```bash
+python -m optimind_pipeline --base-url http://<VM_EXTERNAL_IP>:30000/v1 --sample factory --execute
+```
