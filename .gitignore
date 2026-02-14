@@ -8,8 +8,9 @@ build/
 # Query history (local archives of past runs)
 query_history/
 
-# Environment
+# Environment / secrets (never commit real keys)
 .env
+api_keys.env
 .venv/
 venv/
 

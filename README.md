@@ -11,11 +11,17 @@ conda activate optimax
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in the project root:
+Create a local file for API keys (both are gitignored):
+
+- **`.env`** or **`api_keys.env`** in the project root
+
+Copy from `.env.example` and add your keys:
 
 ```
-ANTHROPIC_API_KEY=your-anthropic-key
 OPENAI_API_KEY=your-openai-key
+OPENAI_ORG_ID=your-org-id
+ANTHROPIC_API_KEY=your-anthropic-key
+GROQ_API_KEY=your-groq-key
 ```
 
 A [Gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses/) is required to execute generated solver code.
@@ -85,6 +91,29 @@ from optimus import run_pipeline
 state = run_pipeline("current_query", model="gpt-4o-mini")
 print(state["objective"])
 ```
+
+### Creating inputs from data (CSV / Excel)
+
+To turn a data file and a natural-language problem description into OptiMUS inputs (`desc.txt`, `params.json`, `labels.json`), use:
+
+```bash
+python scripts/data_to_optimus.py --data my_data.csv --description "Maximize profit subject to..."
+python scripts/data_to_optimus.py --data sheet.xlsx --description path/to/desc.txt
+```
+
+Output is written to **`current_query/`** by default (the folder OptiMUS uses). Then run OptiMUS with no extra args: `python optimus.py`. Use `--output DIR` only if you want a different problem folder, then run `python optimus.py --dir DIR`.
+
+**Expert mode (default):** The script uses an LLM to reason like a consultant: it treats the description as a client brief and the data as their spreadsheet. It identifies **parameters** (quantities that appear in the math: capacities, demands, costs, etc.) and can add **derived dimensions** (e.g. NumberOfProducts from row count or distinct IDs) so the formulation has the right structure. ID columns are used for indexing/dimensions rather than as numeric parameters. Optionally it writes a short **model summary** to `assumptions.txt` for the client. No manual specification of parameters is required.
+
+**Options:**
+
+- **`--data`** — One or more paths to CSV or Excel files (e.g. `--data inventory.csv stores.csv`). With multiple files, the expert maps each parameter to a dataset by name (filename stem).
+- **`--description`** — Natural-language problem description, or path to a .txt file containing it.
+- **`--output`** — Directory where to write the three files (default: `current_query`; use this to align with OptiMUS).
+- **`--simple`** — Disable expert reasoning: one parameter per column, with optional LLM polish for definitions/labels.
+- **`--no-llm`** — No LLM at all; one parameter per column, column-based definitions and default labels.
+- **`--model`** — LLM model for parameter extraction and/or definitions/labels (default: `gpt-4o-mini`).
+- **`--labels-file`** — Path to an existing `labels.json` to use as-is.
 
 ---
 

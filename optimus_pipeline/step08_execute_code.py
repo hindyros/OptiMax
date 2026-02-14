@@ -38,25 +38,35 @@ def extract_code(text):
     return code
 
 
-def execute_code(dir, code_filename):
+# Max seconds for running generated code (Gurobi should be fast for typical problems)
+EXECUTE_TIMEOUT_SECONDS = 120
+
+
+def execute_code(dir, code_filename, timeout=EXECUTE_TIMEOUT_SECONDS):
     output_path = os.path.join(dir, "code_output.txt")
     try:
-        code_path = os.path.join(dir, code_filename)
         result = subprocess.run(
             ["python", code_filename],
             capture_output=True,
             text=True,
             check=True,
             cwd=dir,
+            timeout=timeout,
         )
         with open(output_path, "w") as f:
             f.write(result.stdout or "(no stdout)\n")
         return result.stdout, "Success"
+    except subprocess.TimeoutExpired as e:
+        with open(output_path, "w") as f:
+            f.write(f"Execution timed out after {timeout}s.\n")
+            f.write(e.stdout or "")
+            f.write(e.stderr or "")
+        return f"Execution timed out after {timeout} seconds.", "Error"
     except subprocess.CalledProcessError as e:
         with open(output_path, "w") as f:
             f.write("Execution failed:\n")
             f.write(e.stderr or e.stdout or str(e))
-        return e.stderr, "Error"
+        return e.stderr or e.stdout or str(e), "Error"
     except Exception as e:
         with open(output_path, "w") as f:
             f.write("Execution failed:\n")

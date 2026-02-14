@@ -108,7 +108,6 @@
 - [ ] Build text area for problem description
 - [ ] Build parameter entry form (name, type, shape, value)
 - [ ] Build data upload component (drag-and-drop CSV/JSON)
-- [ ] Add problem type selector (maximize / minimize)
 - [ ] Add example problem templates (click to pre-fill)
 - [ ] Add form validation
 - [ ] Wire "Solve" button to `POST /api/problems`
