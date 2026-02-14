@@ -24,7 +24,7 @@ from execute_code import execute_and_debug
 from utils import create_state, get_labels
 
 ERROR_CORRECTION = False
-MODEL = "gpt-4o"
+MODEL = "claude-haiku-4-5-20251001"
 RAG_MODE = None
 DEFAULT_LABELS = {"types": ["Mathematical Optimization"], "domains": ["Operations Management"]}
 

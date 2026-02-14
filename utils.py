@@ -1,14 +1,58 @@
 import os
 import json
-from groq import Groq
-import openai
+import time
 
-groq_key = "###"
-openai_key = "###"
-openai_org = "###"
+# Optional providers: only load and create clients when API keys are set
+groq_key = os.environ.get("GROQ_API_KEY", "###")
+openai_key = os.environ.get("OPENAI_API_KEY", "###")
+openai_org = os.environ.get("OPENAI_ORG_ID", "###")
+anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "###")
 
-groq_client = Groq(api_key=groq_key)
-open_ai_client = openai.Client(api_key=openai_key, organization=openai_org)
+_open_ai_client = None
+_groq_client = None
+_anthropic_client = None
+
+
+def _get_openai_client():
+    global _open_ai_client
+    if _open_ai_client is None:
+        if openai_key == "###":
+            raise ValueError(
+                "OpenAI model requested but OPENAI_API_KEY is not set. "
+                "Set it with: export OPENAI_API_KEY='your-key'"
+            )
+        import openai
+        _open_ai_client = openai.Client(
+            api_key=openai_key,
+            organization=openai_org if openai_org != "###" else None,
+        )
+    return _open_ai_client
+
+
+def _get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        if groq_key == "###":
+            raise ValueError(
+                "Groq model requested but GROQ_API_KEY is not set. "
+                "Set it with: export GROQ_API_KEY='your-key'"
+            )
+        from groq import Groq
+        _groq_client = Groq(api_key=groq_key)
+    return _groq_client
+
+
+def _get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        if anthropic_key == "###":
+            raise ValueError(
+                "Anthropic model requested but ANTHROPIC_API_KEY is not set. "
+                "Set it with: export ANTHROPIC_API_KEY='your-key'"
+            )
+        from anthropic import Anthropic
+        _anthropic_client = Anthropic(api_key=anthropic_key)
+    return _anthropic_client
 
 
 def extract_json_from_end(text):
@@ -108,24 +152,65 @@ def extract_list_from_end(text):
     return jj
 
 
-# "llama3-70b-8192"
-def get_response(prompt, model="llama3-70b-8192"):
-    if model == "llama3-70b-8192":
-        client = groq_client
-    else:
-        client = open_ai_client
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-        model=model,
-    )
+# Retry on transient API errors (500, 429, 529 overloaded, etc.).
+def _retry_llm_call(callable_fn, max_attempts=4, base_delay=2.0):
+    last_error = None
+    for attempt in range(max_attempts):
+        try:
+            return callable_fn()
+        except Exception as e:
+            last_error = e
+            err_str = type(e).__name__
+            is_retryable = (
+                "InternalServerError" in err_str
+                or "RateLimitError" in err_str
+                or "OverloadedError" in err_str
+                or "APIConnectionError" in err_str
+                or (hasattr(e, "status_code") and e.status_code in (500, 502, 503, 429, 529))
+            )
+            if not is_retryable or attempt == max_attempts - 1:
+                raise
+            delay = base_delay * (2**attempt)
+            time.sleep(delay)
+    raise last_error
 
-    res = chat_completion.choices[0].message.content
-    return res
+
+# Default model: Anthropic Claude. Also supports OpenAI (gpt-*) and Groq (llama3-70b-8192).
+def get_response(prompt, model="claude-haiku-4-5-20251001"):
+    if model.startswith("claude-"):
+        client = _get_anthropic_client()
+
+        def _call():
+            message = client.messages.create(
+                model=model,
+                max_tokens=8192,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return message.content[0].text
+
+        return _retry_llm_call(_call)
+    if model == "llama3-70b-8192":
+        client = _get_groq_client()
+
+        def _call():
+            chat_completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=model,
+            )
+            return chat_completion.choices[0].message.content
+
+        return _retry_llm_call(_call)
+    # OpenAI (gpt-* etc.)
+    client = _get_openai_client()
+
+    def _call():
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=model,
+        )
+        return chat_completion.choices[0].message.content
+
+    return _retry_llm_call(_call)
 
 
 def load_state(state_file):

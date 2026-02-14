@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/hindy/Desktop/OptiMUS/example_problem/run_dev/code.py", line 8, in <module>
+    model = Model("OptimizationProblem")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "src/gurobipy/_model.pyx", line 152, in gurobipy._model.Model.__init__
+  File "src/gurobipy/gurobi.pxi", line 40, in gurobipy._core.gurobi._getdefaultenv
+  File "src/gurobipy/env.pxi", line 112, in gurobipy._core.Env.__init__
+gurobipy._exception.GurobiError: Unable to open Gurobi license file '/Users/hindy.gurobi.lic'

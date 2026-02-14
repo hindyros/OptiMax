@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/hindy/Desktop/OptiMUS/example_problem/run_dev/code_1.py", line 3, in <module>
+    from pulp import LpMaximize, LpProblem, LpVariable, lpSum, value
+ModuleNotFoundError: No module named 'pulp'

@@ -58,6 +58,33 @@ You can download the dataset from [https://huggingface.co/datasets/udell-lab/NLP
 ```
 
 
+## Comparing with Microsoft OptiMind
+
+You can run [Microsoft OptiMind-SFT](https://huggingface.co/microsoft/OptiMind-SFT) on the same problems and compare formulations and results.
+
+1. **Start SGLang with OptiMind-SFT** (separate terminal):
+   ```bash
+   python -m sglang.launch_server \
+     --model-path microsoft/OptiMind-SFT \
+     --host 0.0.0.0 --port 30000 \
+     --tensor-parallel-size 1 --trust-remote-code
+   ```
+
+2. **Run OptiMUS** on a problem (e.g. `example_problem`):
+   ```bash
+   python main.py --dir example_problem
+   ```
+
+3. **Run OptiMind on the same problem** (uses `desc.txt` + `run_dev/data.json`):
+   ```bash
+   python run_optimind.py --optimus-dir example_problem
+   ```
+   This writes `example_problem/run_dev/optimind_response.txt` and `example_problem/run_dev/optimind_code.py`.
+
+4. **Compare** formulations and code in `example_problem/run_dev/` (OptiMUS: `state_*.json`, `code_*.py`; OptiMind: `optimind_response.txt`, `optimind_code.py`). Run both generated scripts from that directory (where `data.json` lives) to compare objective values.
+
+Other options: `--sample knapsack`, `--problem "your problem text"`, `--run-all-samples`, `--list-samples`. See `python run_optimind.py --help`.
+
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=teshnizi/OptiMUS&type=date&legend=top-left)](https://www.star-history.com/#teshnizi/OptiMUS&type=date&legend=top-left)

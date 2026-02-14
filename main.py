@@ -19,19 +19,16 @@ parser = argparse.ArgumentParser(description="Run the optimization problem")
 parser.add_argument("--dir", type=str, help="Directory of the problem")
 parser.add_argument("--devmode", type=int, default=1)
 parser.add_argument("--rag-mode", type=RAGMode, choices=list(RAGMode), default=None, help="RAG mode")
+parser.add_argument("--model", type=str, default="claude-haiku-4-5-20251001", help="LLM model (default: Haiku=cheapest; e.g. claude-sonnet-4-20250514, claude-opus-4-6)")
 args = parser.parse_args()
 
 if __name__ == "__main__":
 
     dir = args.dir
-    # Read the params state
-    ########## SET THIS BEFORE RUNNING! ##########
     DEV_MODE = args.devmode
     RAG_MODE = args.rag_mode
     ERROR_CORRECTION = True
-    MODEL = "gpt-4o"
-    # MODEL = "llama3-70b-8192"
-    ##############################################
+    MODEL = args.model
 
     if DEV_MODE:
         run_dir = os.path.join(dir, f"run_dev")

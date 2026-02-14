@@ -1,0 +1,1 @@
+We have 4 items. Each item has a value and a weight. The values are [10, 20, 15, 25] and the weights are [2, 4, 3, 5]. We can carry at most 8 units of weight. Choose which items to take to maximize total value. Each item can be taken at most once.

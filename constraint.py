@@ -167,7 +167,7 @@ Please take a deep breath and think step by step. You will be awarded a million 
 """
 
 
-def extract_score_constraint(desc, text, params, vars, constraints, c, logger):
+def extract_score_constraint(desc, text, params, vars, constraints, c, logger, model="claude-haiku-4-5-20251001"):
     match = re.search(r"\d out of 5", text.lower())
     if match:
         score = int(match.group()[0])
@@ -202,10 +202,7 @@ def extract_score_constraint(desc, text, params, vars, constraints, c, logger):
                 if logger:
                     logger.log("Prompting LLM for feedback:\n")
                     logger.log(prompt)
-                llm_response = get_response(
-                    prompt,
-                    model="gpt-4o",  # you can pass this as an argument to the function instead of hardcoding it
-                )
+                llm_response = get_response(prompt, model=model)
                 if logger:
                     logger.log("---")
                     logger.log(f"Response: {llm_response}")
@@ -385,7 +382,7 @@ def get_constraints(
                         logger.log("----")
                         logger.log(x)
                         logger.log("+--+")
-                    valid, res = q[1](desc, x, params, {}, constraints, c, logger)
+                    valid, res = q[1](desc, x, params, {}, constraints, c, logger, model)
                     if valid:
                         constraints = res
                         break

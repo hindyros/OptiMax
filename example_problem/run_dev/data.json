@@ -1,0 +1,16 @@
+{
+    "NumberOfItems": 4,
+    "ItemValue": [
+        10,
+        20,
+        15,
+        25
+    ],
+    "ItemWeight": [
+        2,
+        4,
+        3,
+        5
+    ],
+    "Capacity": 8
+}

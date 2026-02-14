@@ -39,9 +39,9 @@ def extract_code(text):
 
 
 def execute_code(dir, code_filename):
+    output_path = os.path.join(dir, "code_output.txt")
     try:
         code_path = os.path.join(dir, code_filename)
-        # Using Python's subprocess to execute the code as a separate process
         result = subprocess.run(
             ["python", code_filename],
             capture_output=True,
@@ -49,12 +49,19 @@ def execute_code(dir, code_filename):
             check=True,
             cwd=dir,
         )
-        # save result in a file
-        with open(os.path.join(dir, "code_output.txt"), "w") as f:
-            f.write(f"Optimal Revenue: {result.stdout}\n")
+        with open(output_path, "w") as f:
+            f.write(result.stdout or "(no stdout)\n")
         return result.stdout, "Success"
     except subprocess.CalledProcessError as e:
+        with open(output_path, "w") as f:
+            f.write("Execution failed:\n")
+            f.write(e.stderr or e.stdout or str(e))
         return e.stderr, "Error"
+    except Exception as e:
+        with open(output_path, "w") as f:
+            f.write("Execution failed:\n")
+            f.write(str(e))
+        return str(e), "Error"
 
 
 def execute_and_debug(state, dir, model, logger, max_tries=3):

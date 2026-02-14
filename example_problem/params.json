@@ -1,0 +1,26 @@
+{
+    "NumberOfItems": {
+        "shape": [],
+        "definition": "Number of items",
+        "type": "int",
+        "value": 4
+    },
+    "ItemValue": {
+        "shape": ["NumberOfItems"],
+        "definition": "Value of each item",
+        "type": "float",
+        "value": [10, 20, 15, 25]
+    },
+    "ItemWeight": {
+        "shape": ["NumberOfItems"],
+        "definition": "Weight of each item",
+        "type": "float",
+        "value": [2, 4, 3, 5]
+    },
+    "Capacity": {
+        "shape": [],
+        "definition": "Maximum total weight we can carry",
+        "type": "float",
+        "value": 8
+    }
+}
