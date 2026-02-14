@@ -3,16 +3,17 @@ import time
 import json
 import argparse
 
-from parameters import get_params
-from constraint import get_constraints
-from constraint_model import get_constraint_formulations
-from target_code import get_codes
-from generate_code import generate_code
-from utils import load_state, save_state, Logger
-from objective import get_objective
-from objective_model import get_objective_formulation
-from execute_code import execute_and_debug
-from utils import create_state, get_labels
+from pipeline import (
+    get_params,
+    get_constraints,
+    get_constraint_formulations,
+    get_codes,
+    generate_code,
+    get_objective,
+    get_objective_formulation,
+    execute_and_debug,
+)
+from utils import load_state, save_state, Logger, create_state, get_labels
 from rag.rag_utils import RAGMode
 
 parser = argparse.ArgumentParser(description="Run the optimization problem")
