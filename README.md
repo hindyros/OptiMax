@@ -61,7 +61,7 @@ python optimus.py --clear
 python optimus.py
 ```
 
-**4. Check results** in `current_query/output/`:
+**4. Check results** in `current_query/optimus_output/`:
 
 - `code.py` — The generated Gurobi solver
 - `code_output.txt` — Solver output (optimal value)
@@ -84,4 +84,70 @@ from optimus import run_pipeline
 
 state = run_pipeline("current_query", model="gpt-4o-mini")
 print(state["objective"])
+```
+
+---
+
+## Judge
+
+The judge compares solutions from OptiMUS and OptiMind, picks a winner, and generates a professional natural-language explanation.
+
+### How it Works
+
+1. **Programmatic Triage** — Checks which solvers produced output. If only one solver ran, it is evaluated solo.
+2. **LLM Comparison** — GPT-4o evaluates both solutions on execution success, formulation quality, code correctness, and objective value.
+3. **NL Explanation** — A second LLM call generates a consultant-style executive summary and technical appendix.
+
+### Usage
+
+After running one or both solvers:
+
+```bash
+python judge.py
+```
+
+### Output
+
+Results are written to `current_query/final_output/`:
+
+| File | Contents |
+|------|----------|
+| `verdict.json` | Structured result consumed by the frontend |
+| `explanation.txt` | Full NL explanation (executive summary + technical appendix) |
+
+### `verdict.json` Schema
+
+```json
+{
+    "winner": "optimus",
+    "objective_value": 280.0,
+    "direction": "maximize",
+    "solvers": {
+        "optimus":  { "status": "success", "objective_value": 280.0 },
+        "optimind": { "status": "not_available", "objective_value": null }
+    },
+    "reasoning": "Why this solver was chosen...",
+    "optimus_assessment": "Assessment of OptiMUS solution...",
+    "optimind_assessment": "Assessment of OptiMind solution...",
+    "explanation": "Executive summary text...",
+    "technical_details": "Mathematical formulation, code, solver output..."
+}
+```
+
+**Solver status values:** `"success"` (ran and produced objective value), `"executed"` (ran but no numeric result), `"not_available"` (no output found).
+
+### Options
+
+```
+--dir DIR      Problem directory (default: current_query)
+--model MODEL  LLM model for judging (default: gpt-4o)
+```
+
+### Programmatic Usage
+
+```python
+from judge import compare_solutions
+
+verdict = compare_solutions("current_query")
+print(verdict["winner"], verdict["objective_value"])
 ```
