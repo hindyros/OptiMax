@@ -1,8 +1,6 @@
 import json
+import re
 from optimus_utils import get_response, extract_json_from_end, shape_string_to_list
-import pandas as pd
-from optimus_rag.query_vector_db import RAGFormat, get_rag_from_constraint, get_rag_from_problem_categories, get_rag_from_problem_description
-from optimus_rag.rag_utils import RAGMode, constraint_path
 
 
 def extract_formulation_from_end(text):
@@ -341,21 +339,8 @@ def get_constraint_formulations(
     model,
     check=False,
     logger=None,
-    rag_mode: RAGMode | None = None,
-    labels: dict | None = None
 ):
-    if isinstance(rag_mode, RAGMode):
-        match rag_mode:
-            case RAGMode.PROBLEM_DESCRIPTION:
-                rag = get_rag_from_problem_description(desc, RAGFormat.CONSTRAINT_FORMULATION, top_k=5)
-            case RAGMode.CONSTRAINT_OR_OBJECTIVE:
-                rag = ""
-            case RAGMode.PROBLEM_LABELS:
-                assert labels is not None
-                rag = get_rag_from_problem_categories(desc, labels, RAGFormat.CONSTRAINT_FORMULATION, top_k=5)
-        rag = f"-----\n{rag}-----\n\n"
-    else:
-        rag = ""
+    rag = ""
 
     if logger:
         logger.log("\n\n\n++++++++++++++++++++++++++++++")
@@ -368,15 +353,6 @@ def get_constraint_formulations(
         k = 1
         while k > 0:
             try:
-                if rag_mode == RAGMode.CONSTRAINT_OR_OBJECTIVE:
-                    constraint_df = pd.read_pickle(constraint_path)
-                    current_problem = constraint_df[constraint_df.description == desc]
-                    if not current_problem.empty:
-                        problem_name = current_problem.iloc[0].problem_name
-                    else:
-                        problem_name = None
-                    rag = get_rag_from_constraint(c["description"], RAGFormat.CONSTRAINT_FORMULATION, top_k=10, current_problem_name=problem_name)
-                    rag = f"-----\n{rag}-----\n\n"
                 res = get_response(
                     prompt_constraints_model.format(
                         description=desc,

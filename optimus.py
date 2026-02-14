@@ -25,7 +25,6 @@ from optimus_pipeline import (
     execute_and_debug,
 )
 from optimus_utils import load_state, save_state, Logger, create_state, get_labels
-from optimus_rag.rag_utils import RAGMode
 from query_manager import prepare_workspace
 
 OUTPUT_DIR = "optimus_output"
@@ -34,7 +33,6 @@ DEFAULT_MODEL = "gpt-4o-mini"
 
 def run_pipeline(
     problem_dir="current_query",
-    rag_mode=None,
     model=DEFAULT_MODEL,
     error_correction=True,
 ):
@@ -47,7 +45,6 @@ def run_pipeline(
 
     Args:
         problem_dir:      Path to the problem folder.
-        rag_mode:         RAGMode enum or None.
         model:            LLM model identifier.
         error_correction: Enable self-correction checks at each step.
 
@@ -73,8 +70,6 @@ def run_pipeline(
         check=error_correction,
         logger=logger,
         model=model,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     print(objective)
     state["objective"] = objective
@@ -88,8 +83,6 @@ def run_pipeline(
         check=error_correction,
         logger=logger,
         model=model,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     print(constraints)
     state["constraints"] = constraints
@@ -104,8 +97,6 @@ def run_pipeline(
         check=error_correction,
         logger=logger,
         model=model,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     state["constraints"] = constraints
     state["variables"] = variables
@@ -120,8 +111,6 @@ def run_pipeline(
         state["objective"],
         model=model,
         check=error_correction,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     state["objective"] = objective
     print("DONE OBJECTIVE FORMULATION")
@@ -159,8 +148,6 @@ if __name__ == "__main__":
                              "Place new input files afterward, then run again without --clear.")
     parser.add_argument("--no-archive", action="store_true",
                         help="When used with --clear, skip archiving (just wipe)")
-    parser.add_argument("--rag-mode", type=RAGMode, choices=list(RAGMode),
-                        default=None, help="RAG retrieval mode")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL,
                         help=f"LLM model (default: {DEFAULT_MODEL})")
     args = parser.parse_args()
@@ -175,7 +162,6 @@ if __name__ == "__main__":
     else:
         run_pipeline(
             problem_dir=args.dir,
-            rag_mode=args.rag_mode,
             model=args.model,
             error_correction=True,
         )

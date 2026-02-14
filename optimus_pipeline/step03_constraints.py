@@ -1,7 +1,4 @@
 import json
-import pandas as pd
-from optimus_rag.query_vector_db import RAGFormat, get_rag_from_problem_categories, get_rag_from_problem_description
-from optimus_rag.rag_utils import RAGMode, constraint_path
 from optimus_utils import (
     extract_list_from_end,
     get_response,
@@ -299,26 +296,9 @@ def get_constraints(
     model,
     check=False,
     constraints=None,
-    logger=None, 
-    rag_mode: RAGMode | None = None,
-    labels: dict | None = None
+    logger=None,
 ):
-    if isinstance(rag_mode, RAGMode):
-        constraint_df = pd.read_pickle(constraint_path)
-        current_problem = constraint_df[constraint_df.description == desc]
-        if not current_problem.empty:
-            problem_name = current_problem.iloc[0].problem_name
-        else:
-            problem_name = None
-        match rag_mode:
-            case RAGMode.PROBLEM_DESCRIPTION | RAGMode.CONSTRAINT_OR_OBJECTIVE:
-                rag = get_rag_from_problem_description(desc, RAGFormat.PROBLEM_DESCRIPTION_CONSTRAINTS, top_k=5)
-            case RAGMode.PROBLEM_LABELS:
-                assert labels is not None
-                rag = get_rag_from_problem_categories(desc, labels, RAGFormat.PROBLEM_DESCRIPTION_CONSTRAINTS, top_k=5)
-        rag = f"-----\n{rag}-----\n\n"
-    else:
-        rag = ""
+    rag = ""
 
     print("_________________________ get_constraints _________________________")
     if not constraints:
