@@ -168,12 +168,12 @@ backend/
 ### 2.2 Wrap OptiMUS as a Service (~30 min)
 
 ```python
-async def run_optimus(problem_desc: str, parameters: dict, labels: dict) -> OptimusResult:
+async def run_optimus(problem_desc: str, parameters: dict) -> OptimusResult:
     """Run the full OptiMUS pipeline and return structured results."""
 ```
 
 - [ ] Create `backend/services/optimus.py`
-- [ ] Create temp problem directory from API input (write `desc.txt`, `params.json`, `labels.json`)
+- [ ] Create temp problem directory from API input (write `desc.txt`, `params.json`)
 - [ ] Call pipeline steps programmatically (import from `pipeline/`)
 - [ ] Return structured results: formulation, generated code, execution output, objective value
 - [ ] Handle errors/timeouts gracefully

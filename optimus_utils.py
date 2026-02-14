@@ -282,11 +282,6 @@ def create_state(parent_dir, run_dir):
     state = {"description": desc, "parameters": params}
     return state
 
-def get_labels(dir):
-    with open(os.path.join(dir, "labels.json"), "r") as f:
-        labels = json.load(f)
-    return labels
-
 
 if __name__ == "__main__":
     

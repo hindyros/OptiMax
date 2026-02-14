@@ -3,7 +3,7 @@ OptiMUS solver entry point.
 
 CLI usage:
     python optimus.py --clear              # Step 1: archive + wipe workspace
-    # ... place desc.txt, params.json, labels.json into current_query/ ...
+    # ... place desc.txt and params.json into current_query/ ...
     python optimus.py                      # Step 2: run the pipeline
 
 Programmatic usage:
@@ -24,7 +24,7 @@ from optimus_pipeline import (
     get_objective_formulation,
     execute_and_debug,
 )
-from optimus_utils import load_state, save_state, Logger, create_state, get_labels
+from optimus_utils import load_state, save_state, Logger, create_state
 from query_manager import prepare_workspace
 
 OUTPUT_DIR = "optimus_output"
@@ -40,7 +40,7 @@ def run_pipeline(
     Run the full OptiMUS pipeline on a problem directory.
 
     Expects the workspace to already contain desc.txt, params.json, and
-    labels.json.  Use prepare_workspace() or ``python optimus.py --clear``
+    Use prepare_workspace() or ``python optimus.py --clear``
     to archive and wipe old results *before* placing new input files.
 
     Args:
@@ -56,7 +56,6 @@ def run_pipeline(
 
     # Initialize state from problem description + params
     state = create_state(problem_dir, run_dir)
-    labels = get_labels(problem_dir)
     save_state(state, os.path.join(run_dir, "state_1_params.json"))
 
     logger = Logger(os.path.join(run_dir, "log.txt"))
@@ -157,7 +156,6 @@ if __name__ == "__main__":
         print(f"\nWorkspace '{args.dir}/' is ready. Place your input files:")
         print(f"  {args.dir}/desc.txt       - Problem description")
         print(f"  {args.dir}/params.json    - Parameters with values")
-        print(f"  {args.dir}/labels.json    - Problem category labels")
         print(f"\nThen run:  python optimus.py")
     else:
         run_pipeline(

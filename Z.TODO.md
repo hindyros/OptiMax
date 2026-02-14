@@ -58,7 +58,7 @@
 ### 2.2 Wrap OptiMUS as a Service
 - [ ] Create `backend/services/optimus.py`
 - [ ] Create temp problem dir from API input
-- [ ] Write `desc.txt`, `params.json`, `labels.json` to temp dir
+- [ ] Write `desc.txt`, `params.json` to temp dir
 - [ ] Call OptiMUS pipeline steps programmatically
 - [ ] Parse and return structured results (formulation, code, output, objective value)
 - [ ] Handle errors and timeouts

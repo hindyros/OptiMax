@@ -53,7 +53,6 @@ python optimus.py --clear
 
 - `desc.txt` — Natural-language problem description
 - `params.json` — Parameters with shapes, types, and concrete values
-- `labels.json` — Problem category labels
 
 **3. Run the pipeline:**
 
