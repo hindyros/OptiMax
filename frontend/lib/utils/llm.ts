@@ -145,7 +145,7 @@ export async function continueRefinement(
       });
     }
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       messages,
       response_format: { type: 'json_object' },
@@ -395,7 +395,7 @@ export async function continueBaselineAssessment(
       });
     }
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       messages,
       response_format: { type: 'json_object' },
