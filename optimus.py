@@ -24,7 +24,7 @@ from optimus_pipeline import (
     get_objective_formulation,
     execute_and_debug,
 )
-from optimus_utils import load_state, save_state, Logger, create_state
+from optimus_pipeline.optimus_utils import load_state, save_state, Logger, create_state
 
 OUTPUT_DIR = "optimus_output"
 DEFAULT_MODEL = "gpt-4o-mini"

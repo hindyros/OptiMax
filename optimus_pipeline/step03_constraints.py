@@ -1,5 +1,5 @@
 import json
-from optimus_utils import (
+from optimus_pipeline.optimus_utils import (
     extract_list_from_end,
     get_response,
     extract_json_from_end,

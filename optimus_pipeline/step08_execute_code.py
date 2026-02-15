@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import json
-from optimus_utils import get_response
+from optimus_pipeline.optimus_utils import get_response
 import subprocess
 
 debug_template = """

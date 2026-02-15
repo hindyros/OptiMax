@@ -312,7 +312,7 @@ def extract_params_expert(
 
     data: Either a single DataFrame or a list of (dataset_name, DataFrame) for multiple inputs.
     """
-    from optimus_utils import get_response, extract_json_from_end
+    from optimus_pipeline.optimus_utils import get_response, extract_json_from_end
 
     if isinstance(data, pd.DataFrame):
         datasets = [("data", data)]
@@ -539,7 +539,7 @@ def read_description(description: str) -> str:
 def infer_definitions_with_llm(description: str, params: dict, model: str = "gpt-4o-mini") -> dict:
     """Use an LLM to generate short definitions for each param based on the problem description."""
     try:
-        from optimus_utils import get_response
+        from optimus_pipeline.optimus_utils import get_response
     except ImportError:
         return params
 

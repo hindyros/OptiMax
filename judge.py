@@ -15,7 +15,7 @@ import os
 import json
 import argparse
 
-from optimus_utils import get_response
+from optimus_pipeline.optimus_utils import get_response
 
 JUDGE_MODEL = "gpt-4o"
 FINAL_OUTPUT_DIR = "final_output"

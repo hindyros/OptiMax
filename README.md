@@ -18,7 +18,7 @@ OPENAI_API_KEY=your-openai-key
 OPENAI_ORG_ID=your-org-id
 ANTHROPIC_API_KEY=your-anthropic-key
 GROQ_API_KEY=your-groq-key
-OPTIMIND_SERVER_URL=http://<VM_IP>:30000/v1
+OPTIMIND_SERVER_URL=http://<VM_IP>/v1
 ```
 
 A [Gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses/) is required to execute generated solver code.
@@ -48,12 +48,12 @@ Results appear in `current_query/`:
 | Directory | Contents |
 |-----------|----------|
 | `optimus_output/` | Generated code, solver output, intermediate state, logs |
-| `optimind_output/` | Raw LLM response, extracted code |
+| `optimind_output/` | Raw LLM response, extracted code, execution output, objective value |
 | `final_output/` | `verdict.json` and `explanation.txt` from the judge |
 
 ### `query_manager.py`
 
-Manages the `current_query/` workspace shared by both solvers. Running it archives the current contents to `query_history/<timestamp>/` then wipes the workspace clean.
+Manages the `current_query/` workspace shared by both solvers. Running it archives the current contents to `query_history/<timestamp>/` then deletes all files while preserving the subdirectory structure (`model_input/`, `optimus_output/`, etc.).
 
 ```
 python query_manager.py              # archive + clear (default)
@@ -162,7 +162,7 @@ The model is self-hosted on a GCP VM with a single NVIDIA L4 GPU (24GB VRAM), se
 4. Quantize Q8_0 to Q4_K_M using `llama-quantize --allow-requantize` (~15GB)
 5. Serve with `llama-server` with all layers offloaded to GPU (`--n-gpu-layers 99`)
 
-The Q4_K_M model fits in 24GB VRAM. For step-by-step GCP setup, see **[docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md](docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md)**.
+The Q4_K_M model fits in 24GB VRAM. An **nginx** reverse proxy on port 80 forwards to llama-server on port 30000 (port 80 passes through campus/corporate firewalls that block non-standard ports). For step-by-step GCP setup, see **[docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md](docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md)**.
 
 **Start the server** (on the VM):
 
@@ -176,6 +176,8 @@ cd ~/llama.cpp && nohup ./build/bin/llama-server \
 
 **Check if running:** `pgrep llama-server && echo 'running' || echo 'down'`
 
+**Verify from your machine:** `curl http://<VM_EXTERNAL_IP>/v1/models`
+
 **Stop the VM when done:** `gcloud compute instances stop <INSTANCE> --zone <ZONE> --project <PROJECT>`
 
 ### Configuration
@@ -183,7 +185,7 @@ cd ~/llama.cpp && nohup ./build/bin/llama-server \
 Set in `.env`:
 
 ```
-OPTIMIND_SERVER_URL=http://<VM_EXTERNAL_IP>:30000/v1
+OPTIMIND_SERVER_URL=http://<VM_EXTERNAL_IP>/v1
 ```
 
 ### Options
@@ -209,6 +211,8 @@ Written to `current_query/optimind_output/`:
 |------|----------|
 | `optimind_response.txt` | Full LLM response (reasoning + code) |
 | `optimind_code.py` | Extracted GurobiPy solver code |
+| `code_output.txt` | stdout/stderr from executing the code |
+| `output_solution.txt` | Objective value (written by the executed code) |
 
 ---
 

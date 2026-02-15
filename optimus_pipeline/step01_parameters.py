@@ -2,7 +2,7 @@ import os
 import json
 import re
 
-from optimus_utils import extract_json_from_end, get_response, shape_string_to_list
+from optimus_pipeline.optimus_utils import extract_json_from_end, get_response, shape_string_to_list
 
 
 def extract_score(text, params, param):
