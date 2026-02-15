@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 18.x manually (avoids apt permission issues)
+# Cache bust: 2026-02-15-v2
 ENV NODE_VERSION=18.20.6
 RUN curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz -o node.tar.xz \
     && tar -xf node.tar.xz -C /usr/local --strip-components=1 \
