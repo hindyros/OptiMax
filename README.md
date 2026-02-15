@@ -1,6 +1,6 @@
 # OptiMax
 
-This repo implements an ensemble NL-based optimization solver that compares solutions from an improved OptiMUS and improved OptiMind.
+An ensemble NL-based optimization solver that compares solutions from OptiMUS and OptiMind, then uses an LLM judge to pick the best one.
 
 Built for Treehacks 2026, with credit to original creators of OptiMUS and OptiMind.
 
@@ -11,11 +11,7 @@ conda activate optimax
 pip install -r requirements.txt
 ```
 
-Create a local file for API keys (both are gitignored):
-
-- **`.env`** or **`api_keys.env`** in the project root
-
-Copy from `.env.example` and add your keys:
+Create a `.env` file in the project root (gitignored). Copy from `.env.example` and fill in your keys:
 
 ```
 OPENAI_API_KEY=your-openai-key
@@ -29,9 +25,78 @@ A [Gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses
 
 ---
 
+## Workflow
+
+```bash
+# 1. Clear workspace (archives previous results to query_history/)
+python query_manager.py
+
+# 2. Place input files in current_query/model_input/
+#    - desc.txt       Natural-language problem description
+#    - params.json    Parameters with shapes, types, and concrete values
+
+# 3. Run solvers
+python optimus.py      # OptiMUS  (structured multi-step pipeline)
+python optimind.py     # OptiMind (single-pass LLM solver)
+
+# 4. Compare solutions
+python judge.py
+```
+
+Results appear in `current_query/`:
+
+| Directory | Contents |
+|-----------|----------|
+| `optimus_output/` | Generated code, solver output, intermediate state, logs |
+| `optimind_output/` | Raw LLM response, extracted code |
+| `final_output/` | `verdict.json` and `explanation.txt` from the judge |
+
+### `query_manager.py`
+
+Manages the `current_query/` workspace shared by both solvers. Running it archives the current contents to `query_history/<timestamp>/` then wipes the workspace clean.
+
+```
+python query_manager.py              # archive + clear (default)
+python query_manager.py --no-archive # just wipe, skip archiving
+python query_manager.py --dir DIR    # target a different directory
+```
+
+Archives are capped at 20 (oldest pruned automatically).
+
+**Programmatic usage:**
+
+```python
+from query_manager import prepare_workspace
+prepare_workspace()  # archive + clear current_query/
+```
+
+### Creating inputs from data (CSV / Excel)
+
+Turn a data file and a description into the expected `model_input/` format:
+
+```bash
+python data_to_optimax.py --data my_data.csv --description "Maximize profit subject to..."
+python data_to_optimax.py --data sheet.xlsx --description path/to/desc.txt
+```
+
+Output is written to `current_query/raw_input/` and `current_query/model_input/`. Then run the solvers with no extra args.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--data` | One or more CSV / Excel files |
+| `--description` | Problem description text, or path to a `.txt` file |
+| `--output DIR` | Problem directory (default: `current_query`) |
+| `--simple` | Disable expert reasoning; one parameter per column |
+| `--no-llm` | No LLM at all; column-based definitions |
+| `--model MODEL` | LLM model for extraction (default: `gpt-4o-mini`) |
+
+---
+
 ## OptiMUS
 
-OptiMUS is a structured, multi-step pipeline that converts a natural-language optimization problem into a Gurobi solver script. It decomposes the problem into parameters, objectives, and constraints, formulates each mathematically, generates code, then executes and debugs it.
+A structured, multi-step pipeline that converts a natural-language optimization problem into a Gurobi solver script. It decomposes the problem into parameters, objectives, and constraints, formulates each mathematically, generates code, then executes and debugs it.
 
 ### Pipeline Steps
 
@@ -48,38 +113,11 @@ OptiMUS is a structured, multi-step pipeline that converts a natural-language op
 
 All step files live in `optimus_pipeline/`.
 
-### Usage
-
-**1. Clear the workspace** (archives any previous results to `query_history/`):
-
-```bash
-python optimus.py --clear
-```
-
-**2. Place your problem files** in `current_query/model_input/`:
-
-- `desc.txt` — Natural-language problem description
-- `params.json` — Parameters with shapes, types, and concrete values
-
-**3. Run the pipeline:**
-
-```bash
-python optimus.py
-```
-
-**4. Check results** in `current_query/optimus_output/`:
-
-- `code.py` — The generated Gurobi solver
-- `code_output.txt` — Solver output (optimal value)
-- `state_*.json` — Intermediate state at each pipeline step
-- `log.txt` — Full LLM interaction log
-
 ### Options
 
 ```
---dir DIR        Problem directory (default: current_query)
---model MODEL    LLM model (default: gpt-4o-mini)
---no-archive     With --clear, skip archiving (just wipe)
+--dir DIR      Problem directory (default: current_query)
+--model MODEL  LLM model (default: gpt-4o-mini)
 ```
 
 ### Programmatic Usage
@@ -91,33 +129,22 @@ state = run_pipeline("current_query", model="gpt-4o-mini")
 print(state["objective"])
 ```
 
-### Creating inputs from data (CSV / Excel)
+### Output
 
-To turn a data file and a natural-language problem description into OptiMUS inputs (`model_input/desc.txt`, `model_input/params.json`), use:
+Written to `current_query/optimus_output/`:
 
-```bash
-python data_to_optimax.py --data my_data.csv --description "Maximize profit subject to..."
-python data_to_optimax.py --data sheet.xlsx --description path/to/desc.txt
-```
-
-Output is written under **`current_query/`** by default: **`raw_input/`** (description + raw CSV(s)) and **`model_input/`** (desc.txt, params.json). Then run OptiMUS with no extra args: `python optimus.py`. Use `--output DIR` for a different problem folder, then `python optimus.py --dir DIR`.
-
-**Expert mode (default):** The script uses an LLM to reason like a consultant: it treats the description as a client brief and the data as their spreadsheet. It identifies **parameters** (quantities that appear in the math: capacities, demands, costs, etc.) and can add **derived dimensions** (e.g. NumberOfProducts from row count or distinct IDs) so the formulation has the right structure. ID columns are used for indexing/dimensions rather than as numeric parameters. No manual specification of parameters is required.
-
-**Options:**
-
-- **`--data`** — One or more paths to CSV or Excel files (e.g. `--data inventory.csv stores.csv`). With multiple files, the expert maps each parameter to a dataset by name (filename stem).
-- **`--description`** — Natural-language problem description, or path to a .txt file containing it.
-- **`--output`** — Problem directory; writes `raw_input/` and `model_input/` under it (default: `current_query`).
-- **`--simple`** — Disable expert reasoning: one parameter per column, with optional LLM polish for definitions.
-- **`--no-llm`** — No LLM at all; one parameter per column, column-based definitions.
-- **`--model`** — LLM model for parameter extraction and/or definitions (default: `gpt-4o-mini`).
+| File | Contents |
+|------|----------|
+| `code.py` | Generated Gurobi solver |
+| `code_output.txt` | Solver output (optimal value) |
+| `state_*.json` | Intermediate state at each pipeline step |
+| `log.txt` | Full LLM interaction log |
 
 ---
 
 ## OptiMind
 
-OptiMind is Microsoft Research's fine-tuned LLM for optimization. Given a natural-language problem description, it reasons step-by-step, produces a mathematical formulation, and generates executable GurobiPy code in a single pass.
+Microsoft Research's fine-tuned LLM for optimization. Given a natural-language problem description, it reasons step-by-step, produces a mathematical formulation, and generates executable GurobiPy code in a single pass.
 
 - **Model:** `microsoft/OptiMind-SFT` (20B params, MoE architecture with 3.6B activated)
 - **Base model:** `gpt-oss-20b-BF16`
@@ -135,7 +162,7 @@ The model is self-hosted on a GCP VM with a single NVIDIA L4 GPU (24GB VRAM), se
 4. Quantize Q8_0 to Q4_K_M using `llama-quantize --allow-requantize` (~15GB)
 5. Serve with `llama-server` with all layers offloaded to GPU (`--n-gpu-layers 99`)
 
-The Q4_K_M model fits in 24GB VRAM. For step-by-step GCP setup (VM creation, SGLang alternative), see **[docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md](docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md)**.
+The Q4_K_M model fits in 24GB VRAM. For step-by-step GCP setup, see **[docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md](docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md)**.
 
 **Start the server** (on the VM):
 
@@ -159,51 +186,61 @@ Set in `.env`:
 OPTIMIND_SERVER_URL=http://<VM_EXTERNAL_IP>:30000/v1
 ```
 
-### Usage
-
-```bash
-python optimind.py
-```
-
-This reads the problem from `current_query/`, sends it to the OptiMind server, extracts the generated code, executes it, and writes results to `current_query/optimind_output/`.
-
-Alternatively, use the pipeline entry point:
-
-```bash
-python -m optimind_pipeline --base-url http://<VM_EXTERNAL_IP>:30000/v1 --sample factory --execute
-```
-
 ### Options
 
 ```
---optimus-dir DIR              Problem directory (default: current_query)
---optimind-output-subdir DIR   Output subdirectory (default: optimind_output)
---base-url URL                 Server URL (default: from OPTIMIND_SERVER_URL env var)
+--dir DIR          Problem directory (default: current_query)
+--base-url URL     Server URL (default: from OPTIMIND_SERVER_URL env var)
 ```
+
+### Programmatic Usage
+
+```python
+from optimind import run_pipeline
+
+result = run_pipeline("current_query")
+```
+
+### Output
+
+Written to `current_query/optimind_output/`:
+
+| File | Contents |
+|------|----------|
+| `optimind_response.txt` | Full LLM response (reasoning + code) |
+| `optimind_code.py` | Extracted GurobiPy solver code |
 
 ---
 
 ## Judge
 
-The judge compares solutions from OptiMUS and OptiMind, picks a winner, and generates a professional natural-language explanation.
+Compares solutions from OptiMUS and OptiMind, picks a winner, and generates a professional natural-language explanation.
 
 ### How it Works
 
-1. **Programmatic Triage** — Checks which solvers produced output. If only one solver ran, it is evaluated solo.
-2. **LLM Comparison** — GPT-4o evaluates both solutions on execution success, formulation quality, code correctness, and objective value.
-3. **NL Explanation** — A second LLM call generates a consultant-style executive summary and technical appendix.
+1. **Programmatic Triage** -- Checks which solvers produced output. If only one ran, it is evaluated solo.
+2. **LLM Comparison** -- GPT-4o evaluates both solutions on execution success, formulation quality, code correctness, and objective value.
+3. **NL Explanation** -- A second LLM call generates a consultant-style executive summary and technical appendix.
 
-### Usage
+### Options
 
-After running one or both solvers:
+```
+--dir DIR      Problem directory (default: current_query)
+--model MODEL  LLM model for judging (default: gpt-4o)
+```
 
-```bash
-python judge.py
+### Programmatic Usage
+
+```python
+from judge import compare_solutions
+
+verdict = compare_solutions("current_query")
+print(verdict["winner"], verdict["objective_value"])
 ```
 
 ### Output
 
-Results are written to `current_query/final_output/`:
+Written to `current_query/final_output/`:
 
 | File | Contents |
 |------|----------|
@@ -230,19 +267,3 @@ Results are written to `current_query/final_output/`:
 ```
 
 **Solver status values:** `"success"` (ran and produced objective value), `"executed"` (ran but no numeric result), `"not_available"` (no output found).
-
-### Options
-
-```
---dir DIR      Problem directory (default: current_query)
---model MODEL  LLM model for judging (default: gpt-4o)
-```
-
-### Programmatic Usage
-
-```python
-from judge import compare_solutions
-
-verdict = compare_solutions("current_query")
-print(verdict["winner"], verdict["objective_value"])
-```

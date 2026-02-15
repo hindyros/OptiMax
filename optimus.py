@@ -2,7 +2,7 @@
 OptiMUS solver entry point.
 
 CLI usage:
-    python optimus.py --clear              # Step 1: archive + wipe workspace
+    python query_manager.py                # Step 1: archive + wipe workspace
     # ... place desc.txt, params.json into current_query/model_input/ ...
     python optimus.py                      # Step 2: run the pipeline
 
@@ -25,7 +25,6 @@ from optimus_pipeline import (
     execute_and_debug,
 )
 from optimus_utils import load_state, save_state, Logger, create_state
-from query_manager import prepare_workspace
 
 OUTPUT_DIR = "optimus_output"
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -40,7 +39,7 @@ def run_pipeline(
     Run the full OptiMUS pipeline on a problem directory.
 
     Expects the workspace to already contain model_input/desc.txt and model_input/params.json.
-    Use prepare_workspace() or ``python optimus.py --clear``
+    Use prepare_workspace() or ``python query_manager.py``
     to archive and wipe old results *before* placing new input files.
 
     Args:
@@ -142,24 +141,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the OptiMUS optimization pipeline")
     parser.add_argument("--dir", type=str, default="current_query",
                         help="Problem directory (default: current_query)")
-    parser.add_argument("--clear", action="store_true",
-                        help="Archive old results, wipe workspace, then exit. "
-                             "Place new input files afterward, then run again without --clear.")
-    parser.add_argument("--no-archive", action="store_true",
-                        help="When used with --clear, skip archiving (just wipe)")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL,
                         help=f"LLM model (default: {DEFAULT_MODEL})")
     args = parser.parse_args()
 
-    if args.clear:
-        prepare_workspace(query_dir=args.dir, archive=not args.no_archive)
-        print(f"\nWorkspace '{args.dir}/' is ready. Place your input files:")
-        print(f"  {args.dir}/model_input/desc.txt    - Problem description")
-        print(f"  {args.dir}/model_input/params.json - Parameters with values")
-        print(f"\nThen run:  python optimus.py")
-    else:
-        run_pipeline(
-            problem_dir=args.dir,
-            model=args.model,
-            error_correction=True,
-        )
+    run_pipeline(
+        problem_dir=args.dir,
+        model=args.model,
+        error_correction=True,
+    )

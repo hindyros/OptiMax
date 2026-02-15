@@ -50,21 +50,19 @@ def archive_current_query(query_dir=QUERY_DIR, history_dir=HISTORY_DIR):
 
 def clear_current_query(query_dir=QUERY_DIR):
     """
-    Remove all files and subdirectories inside query_dir, but keep the
-    directory itself so the workspace always exists.
+    Remove all *files* inside query_dir (recursively), but preserve the
+    directory tree so the folder structure (model_input/, optimus_output/,
+    optimind_output/, etc.) stays intact.
     """
     if not os.path.isdir(query_dir):
         os.makedirs(query_dir, exist_ok=True)
         return
 
-    for entry in os.listdir(query_dir):
-        entry_path = os.path.join(query_dir, entry)
-        if os.path.isdir(entry_path):
-            shutil.rmtree(entry_path)
-        else:
-            os.remove(entry_path)
+    for dirpath, _dirnames, filenames in os.walk(query_dir):
+        for fname in filenames:
+            os.remove(os.path.join(dirpath, fname))
 
-    print(f"[query_manager] Cleared {query_dir}/")
+    print(f"[query_manager] Cleared files in {query_dir}/")
 
 
 def enforce_archive_limit(history_dir=HISTORY_DIR, max_archives=MAX_ARCHIVES):
@@ -108,3 +106,31 @@ def prepare_workspace(query_dir=QUERY_DIR, history_dir=HISTORY_DIR,
         enforce_archive_limit(history_dir, max_archives)
 
     clear_current_query(query_dir)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Manage the current_query/ workspace (archive + clear)."
+    )
+    parser.add_argument("--dir", type=str, default=QUERY_DIR,
+                        help=f"Problem directory (default: {QUERY_DIR})")
+    parser.add_argument("--no-archive", action="store_true",
+                        help="Skip archiving (just wipe)")
+    args = parser.parse_args()
+
+    prepare_workspace(query_dir=args.dir, archive=not args.no_archive)
+
+    print(f"\nWorkspace '{args.dir}/' is ready. Place your input files:")
+    print(f"  {args.dir}/model_input/desc.txt    - Problem description")
+    print(f"  {args.dir}/model_input/params.json  - Parameters with values")
+    print(f"\nThen run:")
+    print(f"  python optimus.py    # OptiMUS solver")
+    print(f"  python optimind.py   # OptiMind solver")
+    print(f"  python judge.py      # Compare both solutions")
