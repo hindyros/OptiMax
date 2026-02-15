@@ -1,3 +1,3 @@
 # Model summary and assumptions (for the client)
 
-This model aims to optimize inventory levels and stock allocation across multiple stores and warehouses while considering supplier uncertainties and lead times.
+We are modeling an inventory optimization system for retail operations to minimize stockouts and holding costs while accounting for supplier lead times and warehouse capacities.

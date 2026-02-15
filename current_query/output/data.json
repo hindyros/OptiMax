@@ -34,7 +34,7 @@
         50,
         82
     ],
-    "SupplierLeadTime": [
+    "SupplierLeadTimes": [
         10,
         11,
         25,
@@ -67,7 +67,7 @@
         23,
         10
     ],
-    "StockoutFrequency": [
+    "StockoutFrequencies": [
         14,
         1,
         14,
@@ -100,7 +100,7 @@
         3,
         5
     ],
-    "ReorderPoint": [
+    "ReorderPoints": [
         132,
         127,
         192,
@@ -166,7 +166,7 @@
         4664,
         1158
     ],
-    "OrderFulfillmentTime": [
+    "OrderFulfillmentTimes": [
         6,
         9,
         12,

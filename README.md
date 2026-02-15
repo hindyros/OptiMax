@@ -96,8 +96,8 @@ print(state["objective"])
 To turn a data file and a natural-language problem description into OptiMUS inputs (`desc.txt`, `params.json`), use:
 
 ```bash
-python scripts/data_to_optimus.py --data my_data.csv --description "Maximize profit subject to..."
-python scripts/data_to_optimus.py --data sheet.xlsx --description path/to/desc.txt
+python scripts/data_to_optimax.py --data my_data.csv --description "Maximize profit subject to..."
+python scripts/data_to_optimax.py --data sheet.xlsx --description path/to/desc.txt
 ```
 
 Output is written to **`current_query/`** by default (the folder OptiMUS uses). Then run OptiMUS with no extra args: `python optimus.py`. Use `--output DIR` only if you want a different problem folder, then run `python optimus.py --dir DIR`.

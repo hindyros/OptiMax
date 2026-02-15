@@ -18,128 +18,119 @@
             "definition": "Current stock for each product at each store",
             "type": "integer"
         },
-        "SupplierLeadTime": {
+        "SupplierLeadTimes": {
             "shape": [
                 31
             ],
-            "definition": "Lead time for suppliers in days",
+            "definition": "Lead time required to fulfil orders from suppliers in days",
             "type": "integer"
         },
-        "StockoutFrequency": {
+        "StockoutFrequencies": {
             "shape": [
                 31
             ],
             "definition": "Frequency of stockouts for each product",
             "type": "integer"
         },
-        "ReorderPoint": {
+        "ReorderPoints": {
             "shape": [
                 31
             ],
-            "definition": "Reorder point for each product",
+            "definition": "Stock levels at which orders should be placed for each product",
             "type": "integer"
         },
         "WarehouseCapacity": {
             "shape": [
                 31
             ],
-            "definition": "Capacity of each warehouse",
+            "definition": "Capacity of each warehouse to hold inventory",
             "type": "integer"
         },
-        "OrderFulfillmentTime": {
+        "OrderFulfillmentTimes": {
             "shape": [
                 31
             ],
-            "definition": "Order fulfillment time in days",
+            "definition": "Time taken to fulfill orders in days",
             "type": "integer"
         }
     },
     "objective": {
         "description": "\"The goal is to reduce stockouts on high-demand products, minimize holding and markdown costs, and avoid costly emergency shipments.\"",
-        "formulation": "$\\min \\sum_{p=1}^{NumberOfProducts} \\left( StockoutFrequency_p + c_p \\cdot \\sum_{s=1}^{NumberOfStores} stockAllocated_{ps} \\right)$"
+        "formulation": "$\\min \\sum_{p=1}^{\\text{NumberOfProducts}} \\sum_{s=1}^{\\text{NumberOfStores}} (\\text{StockoutFrequencies}_{p,s} + h_p \\cdot \\text{WarehouseInventory}_{p} + m_p \\cdot \\text{StockoutFrequencies}_{p,s} + E_p \\cdot \\text{EmergencyShipmentsAllowed}_{p,s})$"
     },
     "constraints": [
         {
-            "description": "Current stock levels at each store must be non-negative",
-            "formulation": "$\\forall i,j, stockLevel[i,j] \\geq 0$",
+            "description": "Current stock levels at each store must not fall below zero",
+            "formulation": "$\\forall i, j, StockLevels[i, j] + ReorderQuantities[i, j] \\geq 0$",
             "code": null
         },
         {
-            "description": "Total stock allocated to each product across all stores must not exceed the product's supply capacity at the warehouse",
-            "formulation": "$\\forall p, \\sum_s stockAllocated[p, s] \\leq WarehouseCapacity[p]$",
+            "description": "Total inventory across all stores and warehouses must not exceed warehouse capacity",
+            "formulation": "$\\forall p, \\sum_{s=1}^{NumberOfStores} StockLevels[p, s] + WarehouseInventory[p] \\leq WarehouseCapacity[p]$",
             "code": null
         },
         {
-            "description": "Stock levels after each reorder must satisfy the reorder point for each product",
-            "formulation": "$\\forall p \\in [1, \\text{NumberOfProducts}], \\forall s \\in [1, \\text{NumberOfStores}], \\text{StockLevels}[p][s] + \\text{stockAllocated}[p][s] \\geq \\text{ReorderPoint}[p]$",
+            "description": "Reorder quantities for each product must be non-negative",
+            "formulation": "$\\forall p, s, \\text{ReorderQuantities}[p, s] \\geq 0$",
             "code": null
         },
         {
-            "description": "Number of product reorders must be feasible within supplier lead times",
-            "formulation": "$\\forall p, s, \\sum_{t=0}^{\\text{SupplierLeadTime}[p]} \\text{stockAllocated}[p][s] \\leq \\text{StockLevels}[p][s] + \\text{ReorderPoint}[p]$",
+            "description": "Stock levels at which orders should be placed for each product must not exceed available stock levels",
+            "formulation": "$\\forall p,s: ReorderPoints[p] \\leq StockLevels[p,s] + ReorderQuantities[p,s]$",
             "code": null
         },
         {
-            "description": "Total inventory across all warehouses must not exceed their capacity",
-            "formulation": "$\\sum_{p=1}^{NumberOfProducts} \\sum_{s=1}^{NumberOfStores} stockAllocated[p, s] \\leq \\sum_{w=1}^{3} WarehouseCapacity[w]$",
+            "description": "Order fulfillment times must be accounted for in inventory decisions based on supplier lead times",
+            "formulation": "$\\\\forall p, s: ReorderQuantities[p, s] \\\\leq StockLevels[p, s] + WarehouseInventory[p] - StockoutFrequencies[p] \\\\cdot OrderFulfillmentTimes[p] - SupplierLeadTimes[p]$",
             "code": null
         },
         {
-            "description": "Frequency of stockouts for each product must be minimized to acceptable levels",
-            "formulation": "$\\forall i, StockoutFrequency[i] \\leq acceptableStockoutFrequency[i]$",
+            "description": "The frequency of stockouts must be minimized while considering reorder points",
+            "formulation": "$\\\\forall i, j: StockoutFrequencies[i][j] \\\\geq ReorderPoints[i] - StockLevels[i][j],$",
             "code": null
         },
         {
-            "description": "Total holding costs should not exceed a predetermined budget",
-            "formulation": "$\\sum_{i} \\sum_{j} c_i \\cdot stockAllocated[i, j] \\leq B$",
+            "description": "The total holding costs must be minimized within the limits of warehouse capacity",
+            "formulation": "$\\sum_{p=1}^{NumberOfProducts} WarehouseInventory[p] \\leq \\sum_{w=1}^{NumberOfWarehouses} WarehouseCapacity[w]$",
             "code": null
         },
         {
-            "description": "Markdown prices should be set such that they do not result in negative profits",
-            "formulation": "$\\\\forall i, P_i \\\\cdot D_i - c_i \\\\cdot \\\\sum_j stockAllocated[i,j] \\\\geq 0$",
-            "code": null
-        },
-        {
-            "description": "Order fulfillment time must be accounted for in stock allocation decisions",
-            "formulation": "$\\\\forall i, \\\\forall j, \\\\; stockAllocated[i, j] \\\\geq demand[i, j] \\\\times OrderFulfillmentTime[i]$",
+            "description": "Emergency shipments must be avoided unless stock levels drop below a certain threshold",
+            "formulation": "$\\forall p, s: \\text{EmergencyShipmentsAllowed}[p, s] \\leq \\text{bigM} \\cdot \\left(1 - \\frac{\\text{StockLevels}[p, s] + \\text{ReorderQuantities}[p, s]}{\\text{EmergencyThreshold}}\\right)$",
             "code": null
         }
     ],
     "variables": {
-        "stockAllocated": {
+        "ReorderQuantities": {
             "shape": [
                 "NumberOfProducts",
                 "NumberOfStores"
             ],
-            "type": "continuous",
-            "definition": "The total stock allocated for each product at each store"
+            "type": "integer",
+            "definition": "The quantity to reorder for each product at each store"
         },
-        "acceptableStockoutFrequency": {
+        "WarehouseInventory": {
             "shape": [
                 "NumberOfProducts"
             ],
             "type": "integer",
-            "definition": "The acceptable frequency of stockouts for each product"
+            "definition": "The inventory of each product across all warehouses"
         },
-        "c": {
-            "shape": [
-                "NumberOfProducts"
-            ],
-            "type": "continuous",
-            "definition": "The holding cost per unit for each product"
-        },
-        "B": {
-            "shape": [],
-            "type": "continuous",
-            "definition": "The predetermined budget for total holding costs"
-        },
-        "demand": {
+        "StockoutFrequencies": {
             "shape": [
                 "NumberOfProducts",
                 "NumberOfStores"
             ],
-            "type": "continuous",
-            "definition": "The anticipated demand of each product at each store over the order fulfillment time"
+            "type": "integer",
+            "definition": "The frequency of stockouts for each product at each store"
+        },
+        "EmergencyShipmentsAllowed": {
+            "shape": [
+                "NumberOfProducts",
+                "NumberOfStores"
+            ],
+            "type": "binary",
+            "definition": "Indicator of whether emergency shipments are allowed for each product at each store"
         }
     }
 }

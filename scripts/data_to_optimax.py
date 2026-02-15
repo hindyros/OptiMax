@@ -12,9 +12,9 @@ Two modes:
 - Simple (--no-llm or --simple): One parameter per column with inferred shape/type.
 
 Usage:
-    python scripts/data_to_optimus.py --data my_data.csv --description "Maximize profit..."
-    python scripts/data_to_optimus.py --data sheet.xlsx --description desc.txt
-    python scripts/data_to_optimus.py --data inventory.csv stores.csv --description desc.txt
+    python scripts/data_to_optimax.py --data my_data.csv --description "Maximize profit..."
+    python scripts/data_to_optimax.py --data sheet.xlsx --description desc.txt
+    python scripts/data_to_optimax.py --data inventory.csv stores.csv --description desc.txt
     # Then: python optimus.py
 """
 

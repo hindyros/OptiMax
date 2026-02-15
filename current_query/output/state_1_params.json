@@ -18,39 +18,39 @@
             "definition": "Current stock for each product at each store",
             "type": "integer"
         },
-        "SupplierLeadTime": {
+        "SupplierLeadTimes": {
             "shape": [
                 31
             ],
-            "definition": "Lead time for suppliers in days",
+            "definition": "Lead time required to fulfil orders from suppliers in days",
             "type": "integer"
         },
-        "StockoutFrequency": {
+        "StockoutFrequencies": {
             "shape": [
                 31
             ],
             "definition": "Frequency of stockouts for each product",
             "type": "integer"
         },
-        "ReorderPoint": {
+        "ReorderPoints": {
             "shape": [
                 31
             ],
-            "definition": "Reorder point for each product",
+            "definition": "Stock levels at which orders should be placed for each product",
             "type": "integer"
         },
         "WarehouseCapacity": {
             "shape": [
                 31
             ],
-            "definition": "Capacity of each warehouse",
+            "definition": "Capacity of each warehouse to hold inventory",
             "type": "integer"
         },
-        "OrderFulfillmentTime": {
+        "OrderFulfillmentTimes": {
             "shape": [
                 31
             ],
-            "definition": "Order fulfillment time in days",
+            "definition": "Time taken to fulfill orders in days",
             "type": "integer"
         }
     }
