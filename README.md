@@ -112,23 +112,73 @@ Output is written to **`current_query/`** by default (the folder OptiMUS uses). 
 - **`--simple`** — Disable expert reasoning: one parameter per column, with optional LLM polish for definitions/labels.
 - **`--no-llm`** — No LLM at all; one parameter per column, column-based definitions and default labels.
 - **`--model`** — LLM model for parameter extraction and/or definitions/labels (default: `gpt-4o-mini`).
+
 ---
 
-## OptiMind (GPU server)
+## OptiMind
 
-OptiMind runs via an SGLang server on a machine with an NVIDIA GPU. To use it from this repo you need to:
+OptiMind is Microsoft Research's fine-tuned LLM for optimization. Given a natural-language problem description, it reasons step-by-step, produces a mathematical formulation, and generates executable GurobiPy code in a single pass.
 
-1. **Provision a GPU VM** — e.g. on **Google Cloud** (recommended): see **[docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md](docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md)** for creating a Compute Engine VM (A100 or L4), installing SGLang, and opening port 30000. A script is provided: `scripts/setup-optimind-gcp.sh`.
-2. **Run the client** from your Mac (or any machine with the repo and network access to the VM):
+- **Model:** `microsoft/OptiMind-SFT` (20B params, MoE architecture with 3.6B activated)
+- **Base model:** `gpt-oss-20b-BF16`
+- **Paper:** [OptiMind: Teaching LLMs to Think Like Optimization Experts](https://arxiv.org/abs/2509.22979)
+
+### Deployment
+
+The model is self-hosted on a GCP VM with a single NVIDIA L4 GPU (24GB VRAM), served via **llama.cpp** with Q4_K_M quantization.
+
+**How we got it running:** The full-precision model is ~40GB (BF16), which exceeds the L4's 24GB VRAM. Standard serving frameworks (SGLang FP8, vLLM bitsandbytes, HuggingFace transformers + 4-bit) failed because they load full-precision weights into VRAM before quantizing. The solution was offline quantization via llama.cpp's GGUF format:
+
+1. Build llama.cpp from source with CUDA support (`-DGGML_CUDA=ON`)
+2. Download model from HuggingFace (~40GB safetensors, 10 shards)
+3. Convert to GGUF Q8_0 intermediate using `convert_hf_to_gguf.py` (~22GB)
+4. Quantize Q8_0 to Q4_K_M using `llama-quantize --allow-requantize` (~15GB)
+5. Serve with `llama-server` with all layers offloaded to GPU (`--n-gpu-layers 99`)
+
+The Q4_K_M model fits in 24GB VRAM. For step-by-step GCP setup (VM creation, SGLang alternative), see **[docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md](docs/OPTIMIND_GOOGLE_CLOUD_SETUP.md)**.
+
+**Start the server** (on the VM):
+
+```bash
+cd ~/llama.cpp && nohup ./build/bin/llama-server \
+  --model ~/optimind-sft-Q4_K_M.gguf \
+  --host 0.0.0.0 --port 30000 \
+  --n-gpu-layers 99 --ctx-size 4096 -fa on \
+  > ~/server.log 2>&1 &
+```
+
+**Check if running:** `pgrep llama-server && echo 'running' || echo 'down'`
+
+**Stop the VM when done:** `gcloud compute instances stop <INSTANCE> --zone <ZONE> --project <PROJECT>`
+
+### Configuration
+
+Set in `.env`:
+
+```
+OPTIMIND_SERVER_URL=http://<VM_EXTERNAL_IP>:30000/v1
+```
+
+### Usage
+
+```bash
+python optimind.py
+```
+
+This reads the problem from `current_query/`, sends it to the OptiMind server, extracts the generated code, executes it, and writes results to `current_query/optimind_output/`.
+
+Alternatively, use the pipeline entry point:
 
 ```bash
 python -m optimind_pipeline --base-url http://<VM_EXTERNAL_IP>:30000/v1 --sample factory --execute
 ```
 
-Or use the standalone client with `OPTIMIND_SERVER_URL` in `.env`:
+### Options
 
-```bash
-python optimind.py
+```
+--optimus-dir DIR              Problem directory (default: current_query)
+--optimind-output-subdir DIR   Output subdirectory (default: optimind_output)
+--base-url URL                 Server URL (default: from OPTIMIND_SERVER_URL env var)
 ```
 
 ---
