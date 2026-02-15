@@ -343,3 +343,56 @@ Written to `current_query/final_output/`:
 |------|----------|
 | `report.md` | Full professional Markdown report |
 | `verdict.json` | Enriched with `executive_summary`, `has_baseline_comparison`, `gurobi_stats` |
+
+---
+
+## Known Issues & Future Work
+
+### 1. OptiMind: Data Truncation in Generated Code
+
+**Problem:** OptiMind receives the full raw parameter values in its prompt (e.g. 1,190-element vectors). The LLM cannot reproduce all values in its generated code, so it truncates arrays with comments like `# ... (remaining values omitted for brevity) ...`. The resulting code has mismatched array lengths and crashes with `IndexError` at runtime.
+
+**Proposed fix — Layer 1 (Data injection):** Change `_read_problem()` in `optimind.py` so that instead of dumping raw data values into the prompt, it provides a summary (shapes, types, statistics, sample values) and instructs the LLM to generate code that reads `params.json` from disk at runtime. Copy `params.json` into the `optimind_output/` working directory so the generated code can find it. This prevents the LLM from ever needing to reproduce large data arrays inline.
+
+**Proposed fix — Layer 2 (Debug-and-retry loop):** If the generated code fails execution, feed the code + traceback + params summary back to the LLM and ask it to fix the bug. Retry up to 2–3 times. This catches issues that data injection alone won't prevent: wrong variable names, off-by-one indexing, missing imports, Gurobi API misuse, etc. Small quantized models will sometimes produce imperfect code regardless of input quality, so a correction loop is essential.
+
+**Implementation scope:** All changes are contained in `optimind.py`:
+- Modify `_read_problem()` for data injection + summary
+- Update `SYSTEM_PROMPT` to instruct the model to read from `params.json`
+- Copy `params.json` into the `optimind_output/` working directory
+- Add a `_build_fix_prompt()` helper and wire a retry loop around `_execute_code()` in `run_pipeline()`
+
+### 2. OptiMUS: Fragile Constraint Formulation Parser
+
+**Problem:** `extract_formulation_from_end()` in `step04_constraint_model.py` uses character-by-character string scanning to extract LaTeX formulations and JSON from LLM responses. This parser is brittle — when the LLM formats its response slightly differently than expected (e.g. omits `"NEW VARIABLES"`, uses different casing, or includes nested JSON in constraint descriptions), the string manipulation corrupts the text and the JSON extraction fails. A `.get()` fallback has been applied for `"NEW VARIABLES"`, but the underlying parser remains fragile.
+
+**Proposed fix:** Replace the character-scanning parser with a more robust approach — e.g. regex-based extraction or a two-pass strategy that first extracts the JSON block, then pulls LaTeX strings from the JSON values directly, rather than stripping them from raw text before JSON parsing.
+
+### 3. Constraint Description Format Inconsistency
+
+**Problem:** The constraint extraction step (step 3) sometimes returns constraint descriptions as nested dicts (`{"Description": "...", "Formulation": null, "Code": null}`) instead of plain strings. When these get stringified and passed to the constraint formulation step (step 4), the LLM receives confusing input containing JSON artifacts, which degrades the quality of its response.
+
+**Proposed fix:** Add a normalization step after constraint extraction that ensures every constraint's `description` field is a plain string. If it's a dict, extract the `"Description"` value.
+
+### 4. Baseline Extraction from User Input
+
+**Problem:** The consultant report supports baseline comparison (reading from `model_input/baseline.txt`), but this file must be manually created. There is no automated way to separate a user's conversational input into a problem description and a baseline strategy description.
+
+**Proposed fix:** Add a preprocessing LLM step (or frontend logic) that takes the user's raw input and splits it into the problem description (`desc.txt`) and baseline strategy (`baseline.txt`) when a baseline is mentioned.
+
+### 5. Inaccurate and Unreliable Parameter Extraction from CSVs
+
+**Problem:** The `raw_to_model.py` parameter extraction frequently produces incorrect results, especially with structured or non-trivial CSV formats. Observed failure modes include:
+
+- **Flattening structured data:** When a CSV uses a key-value layout (e.g. columns `Category, Parameter, Value, Unit`), the extractor treats the `Value` column as a single flat vector, mixing unrelated quantities (time strings, nurse counts, wage rates) into one parameter.
+- **Missing parameters:** Numeric values present in the CSV (e.g. hourly wage rates, shift durations) are extracted as `0` or omitted entirely.
+- **Type confusion:** Time strings like `"2:00"` end up in vectors declared as `"type": "integer"`, producing non-numeric data that downstream solvers cannot use.
+- **Semantic misinterpretation:** The LLM does not reliably distinguish between index/label columns and data columns, or between rows that represent different logical entities (e.g. time period definitions vs. shift definitions vs. wage rates in the same CSV).
+
+These issues stem from the single-prompt extraction approach: the LLM receives a column summary and must infer the semantic structure of the data in one pass, which it frequently gets wrong for anything beyond simple tabular layouts.
+
+**Proposed fixes:**
+- **Stronger prompt engineering:** Provide the LLM with more rows of sample data (not just 5) and explicit instructions for handling key-value / pivoted CSV formats.
+- **Multi-pass extraction with validation:** After the first extraction pass, run a validation step that checks extracted values against the raw CSV (e.g. verify that numeric values actually appear in the source data, flag type mismatches).
+- **Schema detection pre-step:** Before parameter extraction, have the LLM classify the CSV structure (flat table, key-value pairs, pivoted, hierarchical) and apply format-specific extraction logic.
+- **Human-in-the-loop review:** For production use, present extracted parameters to the user for confirmation before passing them to solvers.

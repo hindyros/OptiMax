@@ -37,7 +37,7 @@ from optimus_pipeline.optimus_utils import get_response
 # Constants
 # ---------------------------------------------------------------------------
 
-CONSULTANT_MODEL = "gpt-4o"
+CONSULTANT_MODEL = "claude-opus-4-20250514"
 FINAL_OUTPUT_DIR = "final_output"
 
 

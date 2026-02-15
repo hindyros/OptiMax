@@ -47,7 +47,7 @@ from optimus_pipeline.optimus_utils import get_response, extract_json_from_end
 RAW_INPUT_DIR = "raw_input"
 MODEL_INPUT_DIR = "model_input"
 RAW_DESC_FILE = "raw_desc.txt"
-DEFAULT_MODEL = "gpt-4o"
+DEFAULT_MODEL = "claude-opus-4-20250514"
 
 # Special data_column tokens for derived dimensions (not actual columns)
 DERIVED_N_ROWS = "__n_rows__"

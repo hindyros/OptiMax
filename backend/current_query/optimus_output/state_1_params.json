@@ -1,54 +1,54 @@
 {
-    "description": "We often keep patients in the ICU longer than necessary because transfers to step-down or wards happen late in the day. That blocks beds for new admissions. I want to shift transfers earlier (when possible) so ICU beds free up sooner.",
+    "description": "A trading company specializes in the wholesale business of certain grains. The company currently has a warehouse with a capacity of 5000 dan. On January 1, the company has 1000 dan of grain in stock and 20,000 yuan in funds. The estimated grain prices for the first quarter are shown in Table 1-8. Table 1-8 | Month | Purchase Price (yuan/dan) | Selling Price (yuan/dan) | |-------|---------------------------|--------------------------| | 1 | 2.85 | 3.10 | | 2 | 3.05 | 3.25 | | 3 | 2.90 | 2.95 | The purchased grains will be delivered in the same month but can only be sold in the next month, and payment is required upon delivery. The company hopes to have an inventory of 2000 dan at the end of the quarter. What purchasing and selling strategy should be adopted to maximize the total profit over the three months?",
     "parameters": {
-        "NumberOfPatients": {
+        "WarehouseCapacity": {
             "shape": [],
-            "definition": "Total number of rows in admissions dataset",
+            "definition": "Maximum storage capacity of the warehouse in dan",
             "type": "integer"
         },
-        "NumberOfICUStays": {
+        "InitialInventory": {
             "shape": [],
-            "definition": "Total number of rows in icustays dataset",
+            "definition": "Initial grain inventory on January 1 in dan",
             "type": "integer"
         },
-        "NumberOfTransfers": {
+        "InitialFunds": {
             "shape": [],
-            "definition": "Total number of rows in transfers dataset",
-            "type": "integer"
-        },
-        "ICULengthOfStay": {
-            "shape": [
-                140
-            ],
-            "definition": "Length of stay in ICU for each admission",
+            "definition": "Initial available funds on January 1 in yuan",
             "type": "float"
         },
-        "ICUInTimes": {
-            "shape": [
-                140
-            ],
-            "definition": "In-time for each ICU stay",
-            "type": "integer"
+        "PurchasePriceMonth1": {
+            "shape": [],
+            "definition": "Purchase price of grain in month 1 in yuan per dan",
+            "type": "float"
         },
-        "ICUOutTimes": {
-            "shape": [
-                140
-            ],
-            "definition": "Out-time for each ICU stay",
-            "type": "integer"
+        "PurchasePriceMonth2": {
+            "shape": [],
+            "definition": "Purchase price of grain in month 2 in yuan per dan",
+            "type": "float"
         },
-        "TransferInTimes": {
-            "shape": [
-                1190
-            ],
-            "definition": "In-time for each transfer event",
-            "type": "integer"
+        "PurchasePriceMonth3": {
+            "shape": [],
+            "definition": "Purchase price of grain in month 3 in yuan per dan",
+            "type": "float"
         },
-        "TransferOutTimes": {
-            "shape": [
-                1190
-            ],
-            "definition": "Out-time for each transfer event",
+        "SellingPriceMonth1": {
+            "shape": [],
+            "definition": "Selling price of grain in month 1 in yuan per dan",
+            "type": "float"
+        },
+        "SellingPriceMonth2": {
+            "shape": [],
+            "definition": "Selling price of grain in month 2 in yuan per dan",
+            "type": "float"
+        },
+        "SellingPriceMonth3": {
+            "shape": [],
+            "definition": "Selling price of grain in month 3 in yuan per dan",
+            "type": "float"
+        },
+        "TargetFinalInventory": {
+            "shape": [],
+            "definition": "Required grain inventory at end of quarter in dan",
             "type": "integer"
         }
     }
