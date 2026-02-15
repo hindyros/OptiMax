@@ -60,7 +60,6 @@ python optimus.py --clear
 
 - `desc.txt` — Natural-language problem description
 - `params.json` — Parameters with shapes, types, and concrete values
-- `labels.json` — Problem category labels
 
 **3. Run the pipeline:**
 
@@ -80,7 +79,6 @@ python optimus.py
 ```
 --dir DIR        Problem directory (default: current_query)
 --model MODEL    LLM model (default: gpt-4o-mini)
---rag-mode MODE  RAG retrieval mode (optional)
 --no-archive     With --clear, skip archiving (just wipe)
 ```
 
@@ -95,7 +93,7 @@ print(state["objective"])
 
 ### Creating inputs from data (CSV / Excel)
 
-To turn a data file and a natural-language problem description into OptiMUS inputs (`desc.txt`, `params.json`, `labels.json`), use:
+To turn a data file and a natural-language problem description into OptiMUS inputs (`desc.txt`, `params.json`), use:
 
 ```bash
 python scripts/data_to_optimus.py --data my_data.csv --description "Maximize profit subject to..."
@@ -110,12 +108,10 @@ Output is written to **`current_query/`** by default (the folder OptiMUS uses). 
 
 - **`--data`** — One or more paths to CSV or Excel files (e.g. `--data inventory.csv stores.csv`). With multiple files, the expert maps each parameter to a dataset by name (filename stem).
 - **`--description`** — Natural-language problem description, or path to a .txt file containing it.
-- **`--output`** — Directory where to write the three files (default: `current_query`; use this to align with OptiMUS).
+- **`--output`** — Directory where to write desc.txt and params.json (default: `current_query`; use this to align with OptiMUS).
 - **`--simple`** — Disable expert reasoning: one parameter per column, with optional LLM polish for definitions/labels.
 - **`--no-llm`** — No LLM at all; one parameter per column, column-based definitions and default labels.
 - **`--model`** — LLM model for parameter extraction and/or definitions/labels (default: `gpt-4o-mini`).
-- **`--labels-file`** — Path to an existing `labels.json` to use as-is.
-
 ---
 
 ## OptiMind (GPU server)

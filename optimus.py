@@ -3,7 +3,7 @@ OptiMUS solver entry point.
 
 CLI usage:
     python optimus.py --clear              # Step 1: archive + wipe workspace
-    # ... place desc.txt, params.json, labels.json into current_query/ ...
+    # ... place desc.txt, params.json into current_query/ ...
     python optimus.py                      # Step 2: run the pipeline
 
 Programmatic usage:
@@ -24,8 +24,7 @@ from optimus_pipeline import (
     get_objective_formulation,
     execute_and_debug,
 )
-from optimus_utils import load_state, save_state, Logger, create_state, get_labels
-from optimus_rag.rag_utils import RAGMode
+from optimus_utils import load_state, save_state, Logger, create_state
 from query_manager import prepare_workspace
 
 OUTPUT_DIR = "optimus_output"
@@ -34,20 +33,18 @@ DEFAULT_MODEL = "gpt-4o-mini"
 
 def run_pipeline(
     problem_dir="current_query",
-    rag_mode=None,
     model=DEFAULT_MODEL,
     error_correction=True,
 ):
     """
     Run the full OptiMUS pipeline on a problem directory.
 
-    Expects the workspace to already contain desc.txt, params.json, and
-    labels.json.  Use prepare_workspace() or ``python optimus.py --clear``
+    Expects the workspace to already contain desc.txt and params.json.
+    Use prepare_workspace() or ``python optimus.py --clear``
     to archive and wipe old results *before* placing new input files.
 
     Args:
         problem_dir:      Path to the problem folder.
-        rag_mode:         RAGMode enum or None.
         model:            LLM model identifier.
         error_correction: Enable self-correction checks at each step.
 
@@ -59,7 +56,6 @@ def run_pipeline(
 
     # Initialize state from problem description + params
     state = create_state(problem_dir, run_dir)
-    labels = get_labels(problem_dir)
     save_state(state, os.path.join(run_dir, "state_1_params.json"))
 
     logger = Logger(os.path.join(run_dir, "log.txt"))
@@ -73,8 +69,6 @@ def run_pipeline(
         check=error_correction,
         logger=logger,
         model=model,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     print(objective)
     state["objective"] = objective
@@ -88,8 +82,6 @@ def run_pipeline(
         check=error_correction,
         logger=logger,
         model=model,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     print(constraints)
     state["constraints"] = constraints
@@ -104,8 +96,6 @@ def run_pipeline(
         check=error_correction,
         logger=logger,
         model=model,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     state["constraints"] = constraints
     state["variables"] = variables
@@ -120,8 +110,6 @@ def run_pipeline(
         state["objective"],
         model=model,
         check=error_correction,
-        rag_mode=rag_mode,
-        labels=labels,
     )
     state["objective"] = objective
     print("DONE OBJECTIVE FORMULATION")
@@ -159,8 +147,6 @@ if __name__ == "__main__":
                              "Place new input files afterward, then run again without --clear.")
     parser.add_argument("--no-archive", action="store_true",
                         help="When used with --clear, skip archiving (just wipe)")
-    parser.add_argument("--rag-mode", type=RAGMode, choices=list(RAGMode),
-                        default=None, help="RAG retrieval mode")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL,
                         help=f"LLM model (default: {DEFAULT_MODEL})")
     args = parser.parse_args()
@@ -170,12 +156,10 @@ if __name__ == "__main__":
         print(f"\nWorkspace '{args.dir}/' is ready. Place your input files:")
         print(f"  {args.dir}/desc.txt       - Problem description")
         print(f"  {args.dir}/params.json    - Parameters with values")
-        print(f"  {args.dir}/labels.json    - Problem category labels")
         print(f"\nThen run:  python optimus.py")
     else:
         run_pipeline(
             problem_dir=args.dir,
-            rag_mode=args.rag_mode,
             model=args.model,
             error_correction=True,
         )
