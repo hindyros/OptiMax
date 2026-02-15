@@ -83,11 +83,17 @@ def _query_model(
     problem_text: str,
     *,
     model: str = "microsoft/OptiMind-SFT",
-    temperature: float = 0.9,
+    temperature: float = 0.4,
     top_p: float = 1.0,
     max_tokens: int = 4096,
+    frequency_penalty: float = 0.3,
 ) -> str:
-    """Send the problem to the OptiMind server and return the raw response."""
+    """
+    Send the problem to the OptiMind server and return the raw response.
+
+    Lower temperature (0.4) and frequency_penalty reduce repetitive/degenerate
+    output that quantized models sometimes produce at high temperature.
+    """
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -97,6 +103,7 @@ def _query_model(
         temperature=temperature,
         top_p=top_p,
         max_tokens=max_tokens,
+        frequency_penalty=frequency_penalty,
     )
     return response.choices[0].message.content or ""
 

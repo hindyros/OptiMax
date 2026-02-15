@@ -13,10 +13,9 @@ The script will:
     1. Clear the workspace (archive previous results)
     2. Copy uploaded files into current_query/raw_input/
     3. Convert raw inputs to structured model inputs (raw_to_model)
-    4. Run OptiMUS solver
-    5. Run OptiMind solver
-    6. Judge and compare both solutions
-    7. Write the final verdict to current_query/final_output/
+    4. Run OptiMUS and OptiMind solvers in parallel
+    5. Judge and compare both solutions
+    6. Generate a professional consultant report (report.md + enriched verdict.json)
 
 You can also point directly at files instead of using data_upload/:
     python main.py --desc path/to/problem.txt
@@ -40,6 +39,7 @@ from raw_to_model import run_pipeline as raw_to_model
 from optimus import run_pipeline as run_optimus
 from optimind import run_pipeline as run_optimind
 from judge import compare_solutions
+from consultant import generate_report
 
 # ── Constants ──
 QUERY_DIR = "current_query"
@@ -172,7 +172,7 @@ def run(
         The verdict dict from judge.compare_solutions(), or None if
         both solvers failed and no verdict could be produced.
     """
-    total_steps = 5
+    total_steps = 6
     t0 = time.time()
 
     _banner("Optima Pipeline")
@@ -264,6 +264,17 @@ def run(
         _fail(f"Judge failed unexpectedly: {exc}")
         traceback.print_exc()
 
+    # ── Step 6: Consultant report ──
+    report = None
+    if verdict:
+        _step(6, total_steps, "Generating consultant report")
+        try:
+            report = generate_report(problem_dir=query_dir)
+            _ok("Report generated")
+        except Exception as exc:
+            _warn(f"Consultant failed: {exc}")
+            traceback.print_exc()
+
     # ── Summary ──
     elapsed = time.time() - t0
     _banner("Results")
@@ -289,7 +300,7 @@ def run(
         print()
         print(f"  Output files:")
         print(f"    {query_dir}/final_output/verdict.json")
-        print(f"    {query_dir}/final_output/explanation.txt")
+        print(f"    {query_dir}/final_output/report.md")
     else:
         _fail("No verdict could be produced.")
         print(f"  Check solver output in {query_dir}/optimus_output/ and {query_dir}/optimind_output/")

@@ -1,13 +1,14 @@
 """
-LLM Judge -- compares OptiMUS and OptiMind solutions, picks a winner,
-and generates a professional natural-language explanation.
+LLM Judge -- compares OptiMUS and OptiMind solutions and picks a winner.
 
 Decision pipeline:
     1. Load & classify each solver's output (optimal / error / infeasible / none)
     2. Programmatic fast-path for clear-cut cases (one solver missing or crashed)
     3. LLM evaluation for ambiguous cases (both ran, need formulation review)
     4. Sanity-check override (LLM can't pick a crashed solver over a working one)
-    5. Generate natural-language explanation of the winning solution
+
+The judge does NOT generate the final report -- that is handled by
+consultant.py, which runs after the judge.
 
 CLI usage:
     python judge.py                        # compare solutions in current_query/
@@ -449,43 +450,6 @@ Respond with a JSON object **and nothing else**:
 }}"""
 
 
-EXPLANATION_PROMPT = """\
-You are a senior optimization consultant presenting results to a mixed \
-audience. In Part 1 you speak to executives; in Part 2 you speak to \
-technical stakeholders.
-
-## The Problem
-
-{problem_description}
-
-## The Winning Solution ({winner_name})
-
-{winner_details}
-
-## Your Task
-
-**PART 1 — EXECUTIVE SUMMARY**
-
-Write a clear, jargon-free explanation of:
-- What was being optimized and why (business context)
-- What the optimal solution recommends (specific numbers and actions)
-- What the expected outcome is (the objective value, in business terms)
-- Any key trade-offs or considerations
-
-No math, no code. Use concrete language ("produce 40 units" not "set x_A = 40").
-
-**PART 2 — TECHNICAL APPENDIX**
-
-Present the mathematical and implementation details:
-- The objective function in standard form (state maximize vs minimize)
-- All constraints in clear mathematical form, with a note on what each encodes
-- The generated solver code (as provided)
-- The solver output and reported optimal value
-
-Use precise optimization terminology. Separate the two parts with:
---- TECHNICAL APPENDIX ---"""
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # LLM calls
 # ═══════════════════════════════════════════════════════════════════════════
@@ -546,31 +510,6 @@ def evaluate_solutions(problem, optimus, optimind, model=JUDGE_MODEL):
     }
 
 
-def generate_explanation(problem, winner_data, winner_name, model=JUDGE_MODEL):
-    """
-    Generate a professional NL explanation of the winning solution.
-    Returns dict with 'summary' and 'technical' fields.
-    """
-    if winner_name == "optimus":
-        winner_details = _format_optimus_for_judge(winner_data)
-    else:
-        winner_details = _format_optimind_for_judge(winner_data)
-
-    prompt = EXPLANATION_PROMPT.format(
-        problem_description=problem["description"] or "(no description)",
-        winner_name=winner_name.upper(),
-        winner_details=winner_details,
-    )
-
-    response = get_response(prompt, model=model)
-
-    separator = "--- TECHNICAL APPENDIX ---"
-    if separator in response:
-        parts = response.split(separator, 1)
-        return {"summary": parts[0].strip(), "technical": parts[1].strip()}
-    return {"summary": response.strip(), "technical": ""}
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Main orchestration
 # ═══════════════════════════════════════════════════════════════════════════
@@ -578,12 +517,9 @@ def generate_explanation(problem, winner_data, winner_name, model=JUDGE_MODEL):
 
 def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
     """
-    Compare OptiMUS and OptiMind solutions, pick a winner, and generate
-    a professional explanation.
+    Compare OptiMUS and OptiMind solutions and pick a winner.
 
-    Writes results to {problem_dir}/final_output/:
-        - verdict.json   -- structured result for the frontend
-        - explanation.txt -- full NL explanation
+    Writes results to {problem_dir}/final_output/verdict.json.
 
     Returns the verdict dict.
     """
@@ -609,7 +545,7 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
     if prog_winner:
         print(f"[judge] Programmatic winner: {prog_winner} ({prog_reason})")
         winner_name = prog_winner
-        # Still call LLM for quality assessment and explanation
+        # Still call LLM for quality assessment
         print("[judge] Calling LLM for quality assessment...")
         comparison = evaluate_solutions(problem, optimus, optimind, model=model)
         # Override LLM's winner with our programmatic decision
@@ -633,31 +569,24 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
 
     print(f"[judge] Winner: {winner_name}")
 
-    # ── Generate explanation ──
-    print("[judge] Generating professional explanation...")
-    winner_data = optimus if winner_name == "optimus" else optimind
-    explanation = generate_explanation(
-        problem, winner_data, winner_name, model=model
-    )
-    print("[judge] Explanation generated.")
-
     # ── Detect direction ──
     direction = comparison.get("direction", "unknown")
     if direction == "unknown":
-        # Try to detect from code
         for solver in (optimus, optimind):
             if solver and solver.get("direction"):
                 direction = solver["direction"]
                 break
 
     # ── Build verdict ──
+    winner_data = optimus if winner_name == "optimus" else optimind
+
     def _solver_status(solver):
         if not solver or not solver.get("available"):
             return "not_available"
         s = solver.get("execution_status", "not_run")
         if s in ("optimal", "feasible"):
             return "success"
-        return s  # error, infeasible, unbounded, no_result, not_run
+        return s
 
     verdict = {
         "winner": winner_name,
@@ -678,8 +607,6 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
         "reasoning": comparison.get("reasoning", ""),
         "optimus_assessment": comparison.get("optimus_assessment", ""),
         "optimind_assessment": comparison.get("optimind_assessment", ""),
-        "explanation": explanation["summary"],
-        "technical_details": explanation["technical"],
     }
 
     # ── Write output ──
@@ -690,14 +617,6 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
     with open(verdict_path, "w") as f:
         json.dump(verdict, f, indent=2)
     print(f"[judge] Verdict written to {verdict_path}")
-
-    explanation_text = explanation["summary"]
-    if explanation["technical"]:
-        explanation_text += "\n\n--- TECHNICAL APPENDIX ---\n\n" + explanation["technical"]
-    explanation_path = os.path.join(output_dir, "explanation.txt")
-    with open(explanation_path, "w") as f:
-        f.write(explanation_text)
-    print(f"[judge] Explanation written to {explanation_path}")
 
     return verdict
 
