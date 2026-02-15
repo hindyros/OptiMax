@@ -41,7 +41,7 @@ DEFAULT_BASE_URL = os.environ.get(
     "OPTIMIND_SERVER_URL", "http://localhost:30000/v1"
 )
 EXECUTE_TIMEOUT = 120  # seconds
-DEBUG_MAX_RETRIES = 5  # max debug iterations after initial failure
+DEBUG_MAX_RETRIES = 3  # max debug iterations after initial failure
 DEBUG_MODEL = "claude-haiku-4-5-20251001"  # fast LLM for code-fix agent
 
 SYSTEM_PROMPT = (
