@@ -11,7 +11,9 @@ Writes:
     current_query/model_input/params.json   - Structured parameters with values
 
 Two modes (chosen automatically):
-    - CSV mode:  raw_desc.txt + raw_params.csv -> LLM maps CSV columns to params
+    - CSV+Text mode: raw_desc.txt + raw_params.csv -> LLM maps CSV columns to params,
+      then a second pass extracts additional numeric constants from the description
+      that are NOT in the CSV (costs, rates, budgets, etc.)
     - Text mode: raw_desc.txt only -> LLM extracts params from the description
 
 CLI usage:
@@ -43,7 +45,7 @@ RAW_INPUT_DIR = "raw_input"
 MODEL_INPUT_DIR = "model_input"
 RAW_DESC_FILE = "raw_desc.txt"
 RAW_PARAMS_FILE = "raw_params.csv"
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "gpt-4o"
 
 # Special data_column tokens for derived dimensions (not actual columns)
 DERIVED_N_ROWS = "__n_rows__"
@@ -471,6 +473,109 @@ def _desc_only_extract(description: str, model: str = DEFAULT_MODEL) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Supplement extraction (text params that CSV missed)
+# ---------------------------------------------------------------------------
+
+
+def _build_supplement_prompt(description: str, existing_params: list[str]) -> str:
+    """
+    Prompt that extracts ONLY the numeric constants from the description that
+    are NOT already covered by CSV-sourced parameters.
+    """
+    existing_list = "\n".join(f"  - {p}" for p in existing_params)
+    return f"""You are an optimization expert. A client described a business problem, and a dataset has already been used to extract the following parameters:
+
+Already extracted from dataset:
+{existing_list}
+
+Client description:
+-----
+{description}
+-----
+
+Your job: find any ADDITIONAL numeric constants or quantities mentioned in the description that are NOT already covered by the parameters above. These are typically scalar values like costs, rates, budgets, capacities, limits, percentages, or counts that appear in the prose but not in the data.
+
+Rules:
+- ONLY extract parameters whose values appear explicitly in the description text.
+- Do NOT re-extract anything already covered above (even under a different name).
+- Do NOT invent values. If no additional parameters exist, return {{"parameters": []}}.
+- Use clear, descriptive camelCase symbol names.
+- "type" should be "integer" for whole-number counts, "float" otherwise.
+
+Output a single JSON object with one key "parameters" whose value is an array. Each spec:
+- "symbol": camelCase identifier
+- "definition": one short sentence
+- "type": "float" or "integer"
+- "value": the numeric value from the description
+
+Output only the JSON object, no other text."""
+
+
+def _supplement_extract(
+    description: str,
+    existing_params: list[str],
+    model: str = DEFAULT_MODEL,
+) -> dict:
+    """
+    Extract additional parameters from the description that the CSV extraction
+    missed.  Returns a dict of param_name -> param_spec (same format as other
+    extractors).  Returns empty dict if nothing extra is found.
+    """
+    prompt = _build_supplement_prompt(description, existing_params)
+    try:
+        response = get_response(prompt, model=model)
+        raw = extract_json_from_end(response)
+    except Exception as e:
+        print(f"  [warn] Supplement extraction failed: {e}", file=sys.stderr)
+        return {}
+
+    if "parameters" not in raw:
+        return {}
+    specs = raw["parameters"]
+    if not isinstance(specs, list):
+        return {}
+
+    params = {}
+    for item in specs:
+        if not isinstance(item, dict):
+            continue
+
+        symbol = item.get("symbol")
+        definition = item.get("definition", "")
+        ptype = item.get("type", "float")
+        value = item.get("value")
+
+        if not symbol or value is None:
+            continue
+
+        # Clean symbol
+        symbol = re.sub(r"[^\w]", "", str(symbol))
+        if not symbol:
+            continue
+        if symbol[0].islower():
+            symbol = symbol[0].upper() + symbol[1:]
+
+        ptype = "integer" if str(ptype).lower() in ("int", "integer") else "float"
+
+        # Determine shape from value
+        if isinstance(value, list):
+            shape = [len(value)]
+            value = _to_json_serializable(value)
+        else:
+            shape = []
+            value = _to_json_serializable(value)
+
+        params[symbol] = {
+            "shape": shape,
+            "definition": definition or f"Parameter {symbol}",
+            "type": ptype,
+            "value": value,
+        }
+
+    return params
+
+
+# ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
 
@@ -483,7 +588,9 @@ def run_pipeline(
     Convert raw_input/ into model_input/.
 
     Two modes (chosen automatically):
-        - CSV mode:  raw_desc.txt + raw_params.csv exist -> LLM maps CSV columns to params
+        - CSV+Text mode: raw_desc.txt + raw_params.csv exist -> LLM maps CSV
+          columns to params, then a second pass extracts additional numeric
+          constants from the description that are NOT in the CSV.
         - Text mode: only raw_desc.txt exists -> LLM extracts params from description
 
     Writes:
@@ -519,21 +626,40 @@ def run_pipeline(
     print(f"Description: {description[:150]}{'...' if len(description) > 150 else ''}")
 
     if has_csv:
-        # ---- CSV mode: description + data ----
+        # ---- CSV+Text mode: description + data ----
         df = pd.read_csv(csv_path)
         print(f"Data: {len(df)} rows, {len(df.columns)} columns from {RAW_PARAMS_FILE}")
         print(f"Columns: {list(df.columns)}")
         print()
-        print("Extracting parameters from description + CSV (expert mode)...")
+        print("Extracting parameters from CSV (expert mode)...")
         try:
             params = _expert_extract(description, df, model=model)
             if not params:
                 raise ValueError("LLM returned zero parameters")
-            print(f"LLM extracted {len(params)} parameters.")
+            print(f"  CSV extraction: {len(params)} parameters.")
         except Exception as e:
-            print(f"[warn] LLM extraction failed: {e}", file=sys.stderr)
+            print(f"[warn] CSV extraction failed: {e}", file=sys.stderr)
             print("Falling back to simple mode (one param per column).", file=sys.stderr)
             params = _simple_extract(df)
+
+        # ---- Supplement: extract text-only params the CSV missed ----
+        print("Extracting additional parameters from description text...")
+        supplement = _supplement_extract(
+            description, list(params.keys()), model=model
+        )
+        if supplement:
+            # Merge: CSV params take priority, supplement fills gaps
+            added = []
+            for sym, spec in supplement.items():
+                if sym not in params:
+                    params[sym] = spec
+                    added.append(sym)
+            if added:
+                print(f"  Text supplement: +{len(added)} parameters: {added}")
+            else:
+                print("  Text supplement: no new parameters (all covered by CSV).")
+        else:
+            print("  Text supplement: no additional parameters found.")
     else:
         # ---- Text mode: description only ----
         print("No CSV found. Extracting parameters directly from description...")

@@ -13,6 +13,8 @@ Programmatic usage:
 
 import os
 import argparse
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from optimus_pipeline import (
     get_params,
@@ -27,7 +29,23 @@ from optimus_pipeline import (
 from optimus_pipeline.optimus_utils import load_state, save_state, Logger, create_state
 
 OUTPUT_DIR = "optimus_output"
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
+
+class _ThreadSafeLogger:
+    """Wrapper around Logger that serialises writes with a lock."""
+
+    def __init__(self, logger):
+        self._logger = logger
+        self._lock = threading.Lock()
+
+    def log(self, text):
+        with self._lock:
+            self._logger.log(text)
+
+    def reset(self):
+        with self._lock:
+            self._logger.reset()
 
 
 def run_pipeline(
@@ -57,33 +75,34 @@ def run_pipeline(
     state = create_state(problem_dir, run_dir)
     save_state(state, os.path.join(run_dir, "state_1_params.json"))
 
-    logger = Logger(os.path.join(run_dir, "log.txt"))
-    logger.reset()
+    raw_logger = Logger(os.path.join(run_dir, "log.txt"))
+    raw_logger.reset()
+    logger = _ThreadSafeLogger(raw_logger)
 
-    # Step 2: Extract objective
+    # Steps 2+3: Extract objective and constraints in parallel
+    # (both depend only on description + parameters)
     state = load_state(os.path.join(run_dir, "state_1_params.json"))
-    objective = get_objective(
-        state["description"],
-        state["parameters"],
-        check=error_correction,
-        logger=logger,
-        model=model,
-    )
-    print(objective)
-    state["objective"] = objective
-    save_state(state, os.path.join(run_dir, "state_2_objective.json"))
+    desc = state["description"]
+    params = state["parameters"]
 
-    # Step 3: Extract constraints
-    state = load_state(os.path.join(run_dir, "state_2_objective.json"))
-    constraints = get_constraints(
-        state["description"],
-        state["parameters"],
-        check=error_correction,
-        logger=logger,
-        model=model,
-    )
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        obj_future = executor.submit(
+            get_objective, desc, params,
+            check=error_correction, logger=logger, model=model,
+        )
+        con_future = executor.submit(
+            get_constraints, desc, params,
+            check=error_correction, logger=logger, model=model,
+        )
+        objective = obj_future.result()
+        constraints = con_future.result()
+
+    print(objective)
     print(constraints)
+
+    state["objective"] = objective
     state["constraints"] = constraints
+    save_state(state, os.path.join(run_dir, "state_2_objective.json"))
     save_state(state, os.path.join(run_dir, "state_3_constraints.json"))
 
     # Step 4: Formulate constraints (LaTeX)

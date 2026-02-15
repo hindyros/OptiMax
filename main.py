@@ -32,6 +32,7 @@ import shutil
 import sys
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── Pipeline imports ──
 from query_manager import prepare_workspace
@@ -171,7 +172,7 @@ def run(
         The verdict dict from judge.compare_solutions(), or None if
         both solvers failed and no verdict could be produced.
     """
-    total_steps = 6
+    total_steps = 5
     t0 = time.time()
 
     _banner("Optima Pipeline")
@@ -215,36 +216,44 @@ def run(
         print(f"\n{_RED}Cannot continue without model inputs. Aborting.{_RESET}")
         sys.exit(1)
 
-    # ── Step 4: Run OptiMUS ──
-    _step(4, total_steps, "Running OptiMUS solver")
+    # ── Step 4: Run OptiMUS + OptiMind in parallel ──
+    _step(4, total_steps, "Running OptiMUS and OptiMind solvers in parallel")
     optimus_ok = False
-    try:
-        optimus_result = run_optimus(problem_dir=query_dir)
-        optimus_ok = True
-        _ok("OptiMUS finished")
-    except Exception as exc:
-        _warn(f"OptiMUS failed: {exc}")
-        traceback.print_exc()
-
-    # ── Step 5: Run OptiMind ──
-    _step(5, total_steps, "Running OptiMind solver")
     optimind_ok = False
-    try:
-        optimind_result = run_optimind(problem_dir=query_dir)
-        optimind_ok = optimind_result.get("success", False)
-        if optimind_ok:
-            _ok("OptiMind finished")
-        else:
-            _warn("OptiMind ran but did not produce a successful solution")
-    except Exception as exc:
-        _warn(f"OptiMind failed: {exc}")
-        traceback.print_exc()
+
+    def _run_optimus():
+        return ("optimus", run_optimus(problem_dir=query_dir))
+
+    def _run_optimind():
+        return ("optimind", run_optimind(problem_dir=query_dir))
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {
+            executor.submit(_run_optimus): "optimus",
+            executor.submit(_run_optimind): "optimind",
+        }
+        for future in as_completed(futures):
+            solver_name = futures[future]
+            try:
+                name, result = future.result()
+                if name == "optimus":
+                    optimus_ok = True
+                    _ok("OptiMUS finished")
+                else:
+                    optimind_ok = result.get("success", False)
+                    if optimind_ok:
+                        _ok("OptiMind finished")
+                    else:
+                        _warn("OptiMind ran but did not produce a successful solution")
+            except Exception as exc:
+                _warn(f"{solver_name} failed: {exc}")
+                traceback.print_exc()
 
     if not optimus_ok and not optimind_ok:
         _warn("Both solvers failed — judge will attempt to evaluate partial output")
 
-    # ── Step 6: Judge ──
-    _step(6, total_steps, "Judging solutions")
+    # ── Step 5: Judge ──
+    _step(5, total_steps, "Judging solutions")
     verdict = None
     try:
         verdict = compare_solutions(problem_dir=query_dir)

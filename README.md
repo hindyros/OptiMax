@@ -15,24 +15,23 @@ Create a `.env` file in the project root (gitignored). Copy from `.env.example` 
 
 ```
 OPENAI_API_KEY=your-openai-key
-OPENAI_ORG_ID=your-org-id
 ANTHROPIC_API_KEY=your-anthropic-key
-GROQ_API_KEY=your-groq-key
 OPTIMIND_SERVER_URL=http://<VM_IP>/v1
+
+# Gurobi WLS (cloud license — works on any machine)
+GRB_WLSACCESSID=your-access-id
+GRB_WLSSECRET=your-secret
+GRB_LICENSEID=your-license-id
 ```
 
 ### Gurobi license (for running generated solver code)
 
 The pipeline generates and runs Gurobi (Python) code. You need a valid **Gurobi license** for that to work.
 
-- **Get a license:** [Academic (free)](https://www.gurobi.com/academia/academic-program-and-licenses/) or [commercial](https://www.gurobi.com/licenses/). Use the [Gurobi User Portal](https://portal.gurobi.com/iam/licenses/list) to retrieve your license key or run `grbgetkey` (included with a full Gurobi install).
-- **Set it up** so that `gurobipy` can find it:
-  - **Option A (recommended):** Put your `gurobi.lic` file in a default location. On macOS: `/Library/gurobi/gurobi.lic` (system-wide) or `~/gurobi.lic` (your user only). On Linux: `/opt/gurobi/gurobi.lic` or `~/gurobi.lic`.
-  - **Option B:** Point to the file with an environment variable (e.g. in `.env` or your shell profile):
-    ```bash
-    export GRB_LICENSE_FILE=/path/to/gurobi.lic
-    ```
-    The variable must point to the **file**, not the folder.
+- **Get a license:** [Academic (free)](https://www.gurobi.com/academia/academic-program-and-licenses/) or [commercial](https://www.gurobi.com/licenses/). Use the [Gurobi User Portal](https://portal.gurobi.com/iam/licenses/list) to retrieve your license key.
+- **Set it up** — two options:
+  - **Option A — WLS (recommended for teams/deployment):** Add your Web License Service credentials to `.env` (see above). Works on any machine without a local license file.
+  - **Option B — Local license file:** Run `grbgetkey` to download `gurobi.lic` to `~/gurobi.lic`. Only works on that machine.
 
 If the license is not set up, running the pipeline or executing generated code will fail with a Gurobi license error.
 
@@ -65,11 +64,19 @@ python main.py --desc path/to/problem.txt --data path/to/params.csv
 | 1 | Archive + clear `current_query/` |
 | 2 | Copy uploaded files into `current_query/raw_input/` (renamed to `raw_desc.txt` / `raw_params.csv`) |
 | 3 | `raw_to_model` — LLM converts raw inputs to `model_input/desc.txt` + `params.json` |
-| 4 | `optimus` — structured multi-step OptiMUS solver |
-| 5 | `optimind` — single-pass OptiMind LLM solver |
-| 6 | `judge` — compares both solutions, picks a winner, generates explanation |
+| 4 | `optimus` + `optimind` — **run in parallel** (structured multi-step solver + single-pass LLM solver) |
+| 5 | `judge` — compares both solutions, picks a winner, generates explanation |
 
 If one solver fails, the other's result is still judged. If both fail, you get a clear error.
+
+### LLM models
+
+| Stage | Provider | Model |
+|-------|----------|-------|
+| raw_to_model | OpenAI | `gpt-4o` |
+| OptiMUS (all pipeline steps) | Anthropic | `claude-sonnet-4-20250514` |
+| OptiMind (solver) | Self-hosted (GCP) | `microsoft/OptiMind-SFT` |
+| Judge (comparison + explanation) | OpenAI | `gpt-4o` |
 
 ### CLI options
 
@@ -124,13 +131,13 @@ Archives are capped at 20 (oldest pruned automatically).
 
 Converts `raw_input/` into `model_input/`. Two modes, chosen automatically:
 
-- **CSV mode** (raw_desc.txt + raw_params.csv): LLM reasons over the description and data, mapping CSV columns to optimization parameters with types, shapes, and values.
+- **CSV+Text mode** (raw_desc.txt + raw_params.csv): LLM maps CSV columns to optimization parameters, then a second pass extracts additional numeric constants from the description text that aren't in the CSV (costs, rates, budgets, etc.). Merges both sources.
 - **Text mode** (raw_desc.txt only): LLM extracts numeric parameters directly from the problem description. Best for simple problems where all data is stated in prose.
 
 ```
 python raw_to_model.py               # process current_query/
 python raw_to_model.py --dir DIR     # different problem directory
-python raw_to_model.py --model MODEL # LLM model (default: gpt-4o-mini)
+python raw_to_model.py --model MODEL # LLM model (default: gpt-4o)
 ```
 
 ---
@@ -139,13 +146,15 @@ python raw_to_model.py --model MODEL # LLM model (default: gpt-4o-mini)
 
 A structured, multi-step pipeline that converts a natural-language optimization problem into a Gurobi solver script. It decomposes the problem into parameters, objectives, and constraints, formulates each mathematically, generates code, then executes and debugs it.
 
+Steps 2 and 3 (objective + constraint extraction) run **in parallel** since they only depend on the problem description and parameters.
+
 ### Pipeline Steps
 
 | Step | File | What it does |
 |------|------|--------------|
 | 1 | `step01_parameters.py` | Extract parameters from the problem description |
-| 2 | `step02_objective.py` | Identify the optimization objective |
-| 3 | `step03_constraints.py` | Extract constraints |
+| 2 | `step02_objective.py` | Identify the optimization objective (**parallel with 3**) |
+| 3 | `step03_constraints.py` | Extract constraints (**parallel with 2**) |
 | 4 | `step04_constraint_model.py` | Formulate constraints in LaTeX |
 | 5 | `step05_objective_model.py` | Formulate objective in LaTeX |
 | 6 | `step06_target_code.py` | Generate Gurobi code for each constraint/objective |
@@ -158,7 +167,7 @@ All step files live in `optimus_pipeline/`.
 
 ```
 --dir DIR      Problem directory (default: current_query)
---model MODEL  LLM model (default: gpt-4o-mini)
+--model MODEL  LLM model (default: claude-sonnet-4-20250514)
 ```
 
 ### Programmatic Usage
@@ -166,7 +175,7 @@ All step files live in `optimus_pipeline/`.
 ```python
 from optimus import run_pipeline
 
-state = run_pipeline("current_query", model="gpt-4o-mini")
+state = run_pipeline("current_query")
 print(state["objective"])
 ```
 
