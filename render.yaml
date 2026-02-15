@@ -1,0 +1,34 @@
+services:
+  # OptiMATE - Combined Frontend + Backend Service
+  - type: web
+    name: optimate
+    runtime: docker
+    region: oregon
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    envVars:
+      # OpenAI & Anthropic
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Gurobi WLS (Cloud License)
+      - key: GRB_WLSACCESSID
+        sync: false
+      - key: GRB_WLSSECRET
+        sync: false
+      - key: GRB_LICENSEID
+        sync: false
+      # OptiMind Server
+      - key: OPTIMIND_SERVER_URL
+        sync: false
+      # HeyGen
+      - key: NEXT_PUBLIC_HEYGEN_API_KEY
+        sync: false
+      # Node environment
+      - key: NODE_ENV
+        value: production
+    disk:
+      name: optimate-data
+      mountPath: /app/backend
+      sizeGB: 10
