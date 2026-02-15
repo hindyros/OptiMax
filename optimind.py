@@ -113,13 +113,14 @@ def build_problem_from_optimus_dir(problem_dir: str, run_subdir: str = "optimus_
     so OptiMind can be run on the same instance as OptiMUS for comparison.
 
     Uses:
-      - problem_dir/desc.txt for the problem description
+      - problem_dir/model_input/desc.txt for the problem description
       - problem_dir/run_subdir/data.json for concrete data (if present), else
-      - problem_dir/params.json "value" fields for data
+      - problem_dir/model_input/params.json "value" fields for data
     """
-    desc_path = os.path.join(problem_dir, "desc.txt")
+    model_dir = os.path.join(problem_dir, "model_input")
+    desc_path = os.path.join(model_dir, "desc.txt")
     if not os.path.isfile(desc_path):
-        raise FileNotFoundError(f"OptiMUS problem dir must contain desc.txt: {desc_path}")
+        raise FileNotFoundError(f"OptiMUS problem dir must contain model_input/desc.txt: {desc_path}")
 
     with open(desc_path, "r") as f:
         description = f.read().strip()
@@ -129,7 +130,7 @@ def build_problem_from_optimus_dir(problem_dir: str, run_subdir: str = "optimus_
         with open(data_path, "r") as f:
             data = json.load(f)
     else:
-        params_path = os.path.join(problem_dir, "params.json")
+        params_path = os.path.join(model_dir, "params.json")
         if not os.path.isfile(params_path):
             raise FileNotFoundError(
                 f"Need either {data_path} or {params_path} for problem data."

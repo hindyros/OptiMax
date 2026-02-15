@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
 Convert a CSV/Excel data file + natural-language problem description into
-OptiMUS input files: desc.txt, params.json, labels.json.
+OptiMUS input files: desc.txt, params.json.
 
-Output is written to current_query/ by default, which is the folder OptiMUS
-expects. Run this script first, then run OptiMUS with no extra args.
+Writes:
+  - current_query/raw_input/   — natural-language description + raw data CSV(s)
+  - current_query/model_input/ — desc.txt, params.json
+
+Run this script first, then run OptiMUS with no extra args.
 
 Two modes:
 - Expert (default with LLM): An LLM reasons over the description and dataset
@@ -12,9 +15,9 @@ Two modes:
 - Simple (--no-llm or --simple): One parameter per column with inferred shape/type.
 
 Usage:
-    python scripts/data_to_optimax.py --data my_data.csv --description "Maximize profit..."
-    python scripts/data_to_optimax.py --data sheet.xlsx --description desc.txt
-    python scripts/data_to_optimax.py --data inventory.csv stores.csv --description desc.txt
+    python data_to_optimax.py --data my_data.csv --description "Maximize profit..."
+    python data_to_optimax.py --data sheet.xlsx --description desc.txt
+    python data_to_optimax.py --data inventory.csv stores.csv --description desc.txt
     # Then: python optimus.py
 """
 
@@ -22,11 +25,12 @@ import argparse
 import json
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
-# Add project root for imports if needed
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pandas as pd
 
@@ -166,8 +170,6 @@ Examples:
 - Number of products from first dataset: {{"symbol": "NumberOfProducts", "definition": "Number of products", "type": "integer", "shape": "[]", "data_column": "{DERIVED_N_ROWS}"{', "data_source": "inventory"' if multi_dataset else ''}}}
 - Stock level per product: {{"symbol": "StockLevels", "definition": "Current stock for each product", "type": "integer", "shape": "[N]", "data_column": "Stock Levels"{', "data_source": "inventory"' if multi_dataset else ''}}}
 - Do not include ProductId/StoreId as numeric parameters unless the formulation truly needs them as numbers.
-
-You may optionally add a key "model_summary" (string) to the JSON: one or two sentences describing what we are modeling and key assumptions. If present, this will be saved for the client.
 
 Output only the JSON object, no other text. Use exact dataset names and column names as shown above."""
 
@@ -339,9 +341,6 @@ def extract_params_expert(
     specs = raw["parameters"]
     if not isinstance(specs, list):
         raise ValueError("'parameters' must be a list. Got: " + str(type(specs)))
-    model_summary = raw.get("model_summary")
-    if model_summary is not None and not isinstance(model_summary, str):
-        model_summary = str(model_summary)
 
     params = {}
     for item in specs:
@@ -420,7 +419,7 @@ def extract_params_expert(
             "type": ptype,
             "value": value,
         }
-    return params, model_summary
+    return params
 
 
 def _sanitize_name(name: str) -> str:
@@ -537,10 +536,6 @@ def read_description(description: str) -> str:
     return description.strip()
 
 
-def default_labels() -> dict:
-    return {"types": ["Mathematical Optimization"], "domains": ["Operations Research"]}
-
-
 def infer_definitions_with_llm(description: str, params: dict, model: str = "gpt-4o-mini") -> dict:
     """Use an LLM to generate short definitions for each param based on the problem description."""
     try:
@@ -578,59 +573,32 @@ TotalLabor: Total available labor hours
     return params
 
 
-def infer_labels_with_llm(description: str, model: str = "gpt-4o-mini") -> dict:
-    """Use an LLM to infer types and domains for labels.json."""
-    try:
-        from optimus_utils import get_response
-    except ImportError:
-        return default_labels()
-
-    prompt = f"""Given this optimization problem description, suggest exactly one "type" and one "domain" from typical categories (e.g. Mathematical Optimization, Linear Programming, Scheduling, Operations Management, Finance, etc.).
-
-Description:
-{description}
-
-Respond with exactly two lines:
-TYPE: <one type>
-DOMAIN: <one domain>
-"""
-    try:
-        resp = get_response(prompt, model=model)
-        labels = default_labels()
-        for line in resp.strip().split("\n"):
-            if line.upper().startswith("TYPE:"):
-                labels["types"] = [line.split(":", 1)[1].strip() or "Mathematical Optimization"]
-            elif line.upper().startswith("DOMAIN:"):
-                labels["domains"] = [line.split(":", 1)[1].strip() or "Operations Research"]
-        return labels
-    except Exception:
-        return default_labels()
+def write_raw_inputs(output_dir: str, description: str, data_paths: list[str]) -> None:
+    """Write natural-language description and copy raw data CSV(s) into output_dir/raw_input/."""
+    raw_dir = os.path.join(output_dir, "raw_input")
+    os.makedirs(raw_dir, exist_ok=True)
+    with open(os.path.join(raw_dir, "desc.txt"), "w") as f:
+        f.write(description)
+    for p in data_paths:
+        dest = os.path.join(raw_dir, os.path.basename(p))
+        if os.path.abspath(p) != os.path.abspath(dest):
+            shutil.copy2(p, dest)
 
 
 def write_optimus_inputs(
     output_dir: str,
     description: str,
     params: dict,
-    labels: dict,
-    model_summary: str | None = None,
 ) -> None:
-    """Write desc.txt, params.json, labels.json and optionally assumptions.txt into output_dir."""
-    os.makedirs(output_dir, exist_ok=True)
+    """Write desc.txt and params.json into output_dir/model_input/."""
+    model_dir = os.path.join(output_dir, "model_input")
+    os.makedirs(model_dir, exist_ok=True)
 
-    with open(os.path.join(output_dir, "desc.txt"), "w") as f:
+    with open(os.path.join(model_dir, "desc.txt"), "w") as f:
         f.write(description)
 
-    with open(os.path.join(output_dir, "params.json"), "w") as f:
+    with open(os.path.join(model_dir, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
-
-    with open(os.path.join(output_dir, "labels.json"), "w") as f:
-        json.dump(labels, f, indent=4)
-
-    if model_summary:
-        with open(os.path.join(output_dir, "assumptions.txt"), "w") as f:
-            f.write("# Model summary and assumptions (for the client)\n\n")
-            f.write(model_summary.strip())
-            f.write("\n")
 
 
 def run(
@@ -640,7 +608,6 @@ def run(
     model: str = "gpt-4o-mini",
     use_expert: bool = True,
     no_llm: bool = False,
-    labels_file: str | None = None,
 ) -> dict:
     """
     Generate OptiMUS inputs from one or more data files and a problem description.
@@ -649,14 +616,13 @@ def run(
     Args:
         data_path: Path to one CSV/Excel file, or list of paths for multiple datasets.
         description_path: Path to .txt with problem description, or the description string.
-        output_dir: Where to write desc.txt, params.json, labels.json (default: current_query).
+        output_dir: Problem directory; writes raw_input/ and model_input/ under it (default: current_query).
         model: LLM model for extraction.
         use_expert: If True, use LLM to map columns to parameters; else one param per column.
-        no_llm: If True, no API calls (one param per column, default labels).
-        labels_file: Optional path to existing labels.json.
+        no_llm: If True, no API calls (one param per column).
 
     Returns:
-        dict with keys description, params, labels (the generated content).
+        dict with keys description, params (the generated content).
     """
     data_paths = [data_path] if isinstance(data_path, str) else list(data_path)
     if not data_paths:
@@ -675,16 +641,15 @@ def run(
         raise ValueError("Empty description.")
 
     use_expert_mode = use_expert and not no_llm
-    model_summary = None
     if use_expert_mode:
         print("Extracting parameters with expert (LLM) reasoning over description and dataset(s)...")
         try:
             if len(datasets) == 1:
-                params, model_summary = extract_params_expert(
+                params = extract_params_expert(
                     description, datasets[0][1], model=model
                 )
             else:
-                params, model_summary = extract_params_expert(
+                params = extract_params_expert(
                     description, datasets, model=model
                 )
         except Exception as e:
@@ -706,28 +671,17 @@ def run(
         if not no_llm:
             params = infer_definitions_with_llm(description, params, model=model)
 
-    if labels_file and os.path.isfile(labels_file):
-        with open(labels_file) as f:
-            labels = json.load(f)
-    elif not no_llm:
-        labels = infer_labels_with_llm(description, model=model)
-    else:
-        labels = default_labels()
-
-    write_optimus_inputs(output_dir, description, params, labels, model_summary=model_summary)
-    print(f"Wrote OptiMUS inputs to {output_dir}/")
-    print(f"  desc.txt, params.json, labels.json ({len(params)} parameters)", end="")
-    if model_summary:
-        print(", assumptions.txt")
-    else:
-        print()
+    write_raw_inputs(output_dir, description, data_paths)
+    write_optimus_inputs(output_dir, description, params)
+    print(f"Wrote raw_input/ and model_input/ under {output_dir}/")
+    print(f"  model_input/desc.txt, model_input/params.json ({len(params)} parameters)")
     print(f"\nNext: run OptiMUS with:")
     if output_dir == "current_query":
         print("  python optimus.py")
     else:
         print(f"  python optimus.py --dir {output_dir}")
 
-    return {"description": description, "params": params, "labels": labels}
+    return {"description": description, "params": params}
 
 
 def main():
@@ -749,7 +703,7 @@ def main():
     parser.add_argument(
         "--output", "-o",
         default="current_query",
-        help="Output directory for desc.txt, params.json, labels.json (default: current_query)",
+        help="Problem directory; writes raw_input/ and model_input/ under it (default: current_query)",
     )
     parser.add_argument(
         "--no-llm",
@@ -766,10 +720,6 @@ def main():
         default="gpt-4o-mini",
         help="LLM model for parameter extraction and/or definition/label inference (default: gpt-4o-mini)",
     )
-    parser.add_argument(
-        "--labels-file",
-        help="Path to existing labels.json to use (overrides generated labels)",
-    )
     args = parser.parse_args()
 
     use_expert = not args.no_llm and not args.simple
@@ -781,7 +731,6 @@ def main():
         model=args.model,
         use_expert=use_expert,
         no_llm=args.no_llm,
-        labels_file=args.labels_file,
     )
 
 

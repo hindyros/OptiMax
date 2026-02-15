@@ -3,7 +3,7 @@ OptiMUS solver entry point.
 
 CLI usage:
     python optimus.py --clear              # Step 1: archive + wipe workspace
-    # ... place desc.txt, params.json into current_query/ ...
+    # ... place desc.txt, params.json into current_query/model_input/ ...
     python optimus.py                      # Step 2: run the pipeline
 
 Programmatic usage:
@@ -39,7 +39,7 @@ def run_pipeline(
     """
     Run the full OptiMUS pipeline on a problem directory.
 
-    Expects the workspace to already contain desc.txt and params.json.
+    Expects the workspace to already contain model_input/desc.txt and model_input/params.json.
     Use prepare_workspace() or ``python optimus.py --clear``
     to archive and wipe old results *before* placing new input files.
 
@@ -154,8 +154,8 @@ if __name__ == "__main__":
     if args.clear:
         prepare_workspace(query_dir=args.dir, archive=not args.no_archive)
         print(f"\nWorkspace '{args.dir}/' is ready. Place your input files:")
-        print(f"  {args.dir}/desc.txt       - Problem description")
-        print(f"  {args.dir}/params.json    - Parameters with values")
+        print(f"  {args.dir}/model_input/desc.txt    - Problem description")
+        print(f"  {args.dir}/model_input/params.json - Parameters with values")
         print(f"\nThen run:  python optimus.py")
     else:
         run_pipeline(

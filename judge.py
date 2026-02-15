@@ -42,8 +42,9 @@ def _read_json(path):
 
 def load_problem(problem_dir):
     """Load the original problem description and parameters."""
-    desc = _read_file(os.path.join(problem_dir, "desc.txt"))
-    params = _read_json(os.path.join(problem_dir, "params.json"))
+    model_dir = os.path.join(problem_dir, "model_input")
+    desc = _read_file(os.path.join(model_dir, "desc.txt"))
+    params = _read_json(os.path.join(model_dir, "params.json"))
     return {"description": desc, "parameters": params}
 
 
@@ -338,7 +339,7 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
     optimind = load_optimind_output(problem_dir)
 
     if not problem["description"]:
-        raise FileNotFoundError(f"No problem description found at {problem_dir}/desc.txt")
+        raise FileNotFoundError(f"No problem description found at {problem_dir}/model_input/desc.txt")
 
     optimus_available = optimus and optimus["available"]
     optimind_available = optimind and optimind["available"]
