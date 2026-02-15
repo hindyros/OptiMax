@@ -1,45 +1,68 @@
 {
-    "description": "A factory produces two products A and B. Product A yields $5 profit per unit and product B yields $4 profit per unit. Each unit of A requires 2 hours of labor and 1 unit of raw material. Each unit of B requires 1 hour of labor and 2 units of raw material. The factory has 100 hours of labor and 80 units of raw material available. Maximize total profit.\n",
+    "description": "I manage inventory operations across 120 retail stores and 3 warehouses, and we\u2019re struggling with stockouts during promotions while excess inventory builds up on slower-moving items.\nUsing our data on sales trends, real-time inventory levels, supplier lead times, and past pricing strategies, how can I decide how much to reorder, where to allocate stock, and when to adjust prices each week?\nSupplier deliveries are unreliable and lead times fluctuate, so I need decisions that account for uncertainty and warehouse capacity limits.\nMy goal is to reduce stockouts on high-demand products, minimize holding and markdown costs, and avoid costly emergency shipments.\nHow can I build an AI-driven system that makes coordinated forecasting, replenishment, allocation, and pricing decisions to keep the right products available at the right time at the lowest total cost?",
     "parameters": {
-        "ProfitA": {
-            "shape": [],
-            "definition": "Profit per unit of product A",
+        "Product_ID": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Product ID",
+            "type": "integer"
+        },
+        "Store_ID": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Store ID",
+            "type": "integer"
+        },
+        "Stock_Levels": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Stock Levels",
+            "type": "integer"
+        },
+        "Supplier_Lead_Time_days": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Supplier Lead Time (days)",
+            "type": "integer"
+        },
+        "Stockout_Frequency": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Stockout Frequency",
+            "type": "integer"
+        },
+        "Reorder_Point": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Reorder Point",
+            "type": "integer"
+        },
+        "Expiry_Date": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Expiry Date",
             "type": "float"
         },
-        "ProfitB": {
-            "shape": [],
-            "definition": "Profit per unit of product B",
-            "type": "float"
+        "Warehouse_Capacity": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Warehouse Capacity",
+            "type": "integer"
         },
-        "LaborPerA": {
-            "shape": [],
-            "definition": "Labor hours required per unit of A",
-            "type": "float"
-        },
-        "MaterialPerA": {
-            "shape": [],
-            "definition": "Raw material required per unit of A",
-            "type": "float"
-        },
-        "LaborPerB": {
-            "shape": [],
-            "definition": "Labor hours required per unit of B",
-            "type": "float"
-        },
-        "MaterialPerB": {
-            "shape": [],
-            "definition": "Raw material required per unit of B",
-            "type": "float"
-        },
-        "TotalLabor": {
-            "shape": [],
-            "definition": "Total available labor hours",
-            "type": "float"
-        },
-        "TotalMaterial": {
-            "shape": [],
-            "definition": "Total available raw material",
-            "type": "float"
+        "Order_Fulfillment_Time_days": {
+            "shape": [
+                31
+            ],
+            "definition": "From column: Order Fulfillment Time (days)",
+            "type": "integer"
         }
     }
 }

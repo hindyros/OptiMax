@@ -21,7 +21,20 @@ GROQ_API_KEY=your-groq-key
 OPTIMIND_SERVER_URL=http://<VM_IP>/v1
 ```
 
-A [Gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses/) is required to execute generated solver code.
+### Gurobi license (for running generated solver code)
+
+The pipeline generates and runs Gurobi (Python) code. You need a valid **Gurobi license** for that to work.
+
+- **Get a license:** [Academic (free)](https://www.gurobi.com/academia/academic-program-and-licenses/) or [commercial](https://www.gurobi.com/licenses/). Use the [Gurobi User Portal](https://portal.gurobi.com/iam/licenses/list) to retrieve your license key or run `grbgetkey` (included with a full Gurobi install).
+- **Set it up** so that `gurobipy` can find it:
+  - **Option A (recommended):** Put your `gurobi.lic` file in a default location. On macOS: `/Library/gurobi/gurobi.lic` (system-wide) or `~/gurobi.lic` (your user only). On Linux: `/opt/gurobi/gurobi.lic` or `~/gurobi.lic`.
+  - **Option B:** Point to the file with an environment variable (e.g. in `.env` or your shell profile):
+    ```bash
+    export GRB_LICENSE_FILE=/path/to/gurobi.lic
+    ```
+    The variable must point to the **file**, not the folder.
+
+If the license is not set up, running the pipeline or executing generated code will fail with a Gurobi license error.
 
 ---
 
