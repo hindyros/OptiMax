@@ -65,6 +65,60 @@ def _read_json(path: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Parameter summarization (keep prompts compact)
+# ---------------------------------------------------------------------------
+
+
+def _summarize_params_for_prompt(
+    params: dict,
+    max_vector_display: int = 10,
+) -> str:
+    """
+    Produce a compact summary of parameters for the consultant prompt.
+
+    Scalars and small vectors (≤ *max_vector_display* elements) are shown in
+    full.  Large vectors are replaced with summary statistics so the LLM can
+    still reason about the data without consuming thousands of tokens.
+    """
+    if not params:
+        return "{}"
+
+    summary: dict = {}
+    for name, spec in params.items():
+        value = spec.get("value")
+        definition = spec.get("definition", "")
+        shape = spec.get("shape", [])
+        ptype = spec.get("type", "float")
+
+        entry: dict = {
+            "definition": definition,
+            "type": ptype,
+            "shape": shape,
+        }
+
+        if isinstance(value, list) and len(value) > max_vector_display:
+            numeric_vals = [v for v in value if isinstance(v, (int, float))]
+            if numeric_vals:
+                entry["count"] = len(value)
+                entry["min"] = min(numeric_vals)
+                entry["max"] = max(numeric_vals)
+                entry["mean"] = round(sum(numeric_vals) / len(numeric_vals), 4)
+                entry["sample (first 5)"] = value[:5]
+                entry["note"] = f"Vector of {len(value)} values (summarized)"
+            else:
+                entry["value"] = value[:max_vector_display]
+                entry["note"] = (
+                    f"Showing first {max_vector_display} of {len(value)} values"
+                )
+        else:
+            entry["value"] = value
+
+        summary[name] = entry
+
+    return json.dumps(summary, indent=2)
+
+
+# ---------------------------------------------------------------------------
 # Gurobi statistics parser
 # ---------------------------------------------------------------------------
 
@@ -288,7 +342,7 @@ scientists — full mathematical rigor, solver details, code.
 
 ## Parameters
 
-{json.dumps(ctx.get('parameters') or {{}}, indent=2)}
+{_summarize_params_for_prompt(ctx.get('parameters') or {})}
 {baseline_section}
 ## Winning Solution
 

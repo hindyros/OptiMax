@@ -1,0 +1,28 @@
+Set parameter Username
+Academic license - for non-commercial use only - expires 2026-08-20
+Gurobi Optimizer version 12.0.3 build v12.0.3rc0 (mac64[arm] - Darwin 23.6.0 23H730)
+
+CPU model: Apple M3 Max
+Thread count: 14 physical cores, 14 logical processors, using up to 14 threads
+
+Optimize a model with 48049 rows, 24221 columns and 119561 nonzeros
+Model fingerprint: 0x9b6d7815
+Model has 280 quadratic objective terms
+Variable types: 421 continuous, 23800 integer (23660 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 6e+02]
+  Objective range  [5e+04, 8e+04]
+  QObjective range [2e-02, 2e+00]
+  Bounds range     [1e+00, 2e+02]
+  RHS range        [1e+00, 8e+04]
+Presolve removed 420 rows and 1 columns
+Presolve time: 0.00s
+
+Explored 0 nodes (0 simplex iterations) in 0.01 seconds (0.02 work units)
+Thread count was 1 (of 14 available processors)
+
+Solution count 0
+
+Model is infeasible or unbounded
+Best objective -, best bound -, gap -
+Optimization status: 4

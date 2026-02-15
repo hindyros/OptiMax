@@ -85,7 +85,7 @@ def _query_model(
     model: str = "microsoft/OptiMind-SFT",
     temperature: float = 0.4,
     top_p: float = 1.0,
-    max_tokens: int = 4096,
+    max_tokens: int = 35000, # If the context window is too small, the model will not be able to see the entire problem description and parameters.
     frequency_penalty: float = 0.3,
 ) -> str:
     """

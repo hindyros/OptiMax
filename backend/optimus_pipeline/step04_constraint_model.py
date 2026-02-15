@@ -71,9 +71,14 @@ def extract_formulation_from_end(text):
     json_res["FORMULATION"] = formulation
     json_res["AUXILIARY CONSTRAINTS"] = auxiliaries
 
+    # LLM may omit or use different casing for NEW VARIABLES
+    new_vars = json_res.get("NEW VARIABLES") or json_res.get("New Variables") or {}
+    if not isinstance(new_vars, dict):
+        new_vars = {}
+
     return (
         json_res["FORMULATION"],
-        json_res["NEW VARIABLES"],
+        new_vars,
         json_res["AUXILIARY CONSTRAINTS"],
     )
 

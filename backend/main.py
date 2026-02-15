@@ -3,8 +3,8 @@
 Optima — end-to-end optimization pipeline.
 
 Place your input files in data_upload/:
-    - A .txt file with the problem description (required)
-    - A .csv file with parameter data       (optional)
+    - A .txt file with the problem description     (required)
+    - One or more .csv files with parameter data   (optional)
 
 Then run:
     python main.py
@@ -19,7 +19,7 @@ The script will:
 
 You can also point directly at files instead of using data_upload/:
     python main.py --desc path/to/problem.txt
-    python main.py --desc path/to/problem.txt --data path/to/params.csv
+    python main.py --desc path/to/problem.txt --data a.csv b.csv c.csv
 """
 
 from __future__ import annotations
@@ -87,11 +87,11 @@ def _fail(msg: str) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _find_upload_files(upload_dir: str) -> tuple[str, str | None]:
+def _find_upload_files(upload_dir: str) -> tuple[str, list[str]]:
     """
-    Locate the required .txt and optional .csv in the upload directory.
+    Locate the required .txt and any .csv files in the upload directory.
 
-    Returns (txt_path, csv_path_or_None).
+    Returns (txt_path, [csv_paths]).
     Exits with a clear error if inputs are invalid.
     """
     if not os.path.isdir(upload_dir):
@@ -114,22 +114,16 @@ def _find_upload_files(upload_dir: str) -> tuple[str, str | None]:
         print(f"  Keep only one .txt file (the problem description).")
         sys.exit(1)
 
-    if len(csv_files) > 1:
-        _fail(f"Multiple .csv files found in {upload_dir}/:")
-        for f in csv_files:
-            print(f"    - {f}")
-        print(f"  Keep at most one .csv file (the parameter data).")
-        sys.exit(1)
-
-    return txt_files[0], csv_files[0] if csv_files else None
+    return txt_files[0], csv_files
 
 
 def _copy_to_raw_input(
     txt_path: str,
-    csv_path: str | None,
+    csv_paths: list[str],
     query_dir: str,
 ) -> None:
-    """Copy user files into current_query/raw_input/, renaming to expected names."""
+    """Copy user files into current_query/raw_input/.
+    The description is renamed to raw_desc.txt; CSVs keep their original names."""
     raw_dir = os.path.join(query_dir, "raw_input")
     os.makedirs(raw_dir, exist_ok=True)
 
@@ -137,12 +131,14 @@ def _copy_to_raw_input(
     shutil.copy2(txt_path, dest_txt)
     _ok(f"{os.path.basename(txt_path)}  →  raw_input/raw_desc.txt")
 
-    if csv_path:
-        dest_csv = os.path.join(raw_dir, "raw_params.csv")
-        shutil.copy2(csv_path, dest_csv)
-        _ok(f"{os.path.basename(csv_path)}  →  raw_input/raw_params.csv")
+    if csv_paths:
+        for csv_path in csv_paths:
+            basename = os.path.basename(csv_path)
+            dest_csv = os.path.join(raw_dir, basename)
+            shutil.copy2(csv_path, dest_csv)
+            _ok(f"{basename}  →  raw_input/{basename}")
     else:
-        print(f"  (no CSV — text-only mode)")
+        print(f"  (no CSVs — text-only mode)")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -152,7 +148,7 @@ def _copy_to_raw_input(
 
 def run(
     desc_path: str | None = None,
-    data_path: str | None = None,
+    data_paths: list[str] | None = None,
     upload_dir: str = UPLOAD_DIR,
     query_dir: str = QUERY_DIR,
     no_archive: bool = False,
@@ -163,7 +159,7 @@ def run(
     Args:
         desc_path:  Explicit path to a .txt description file.
                     If None, discovers from upload_dir.
-        data_path:  Explicit path to a .csv data file (optional).
+        data_paths: Explicit paths to .csv data files (optional).
         upload_dir: Directory to scan for uploaded files.
         query_dir:  Working directory for the pipeline.
         no_archive: If True, skip archiving previous results.
@@ -184,16 +180,22 @@ def run(
             _fail(f"Description file not found: {desc_path}")
             sys.exit(1)
         txt_path = desc_path
-        csv_path = data_path
-        if csv_path and not os.path.isfile(csv_path):
-            _fail(f"Data file not found: {csv_path}")
-            sys.exit(1)
+        csv_paths = data_paths or []
+        for cp in csv_paths:
+            if not os.path.isfile(cp):
+                _fail(f"Data file not found: {cp}")
+                sys.exit(1)
     else:
         # Discover from data_upload/
-        txt_path, csv_path = _find_upload_files(upload_dir)
+        txt_path, csv_paths = _find_upload_files(upload_dir)
 
     print(f"  Description: {txt_path}")
-    print(f"  Data:        {csv_path or '(none)'}")
+    if csv_paths:
+        print(f"  Data:        {len(csv_paths)} CSV(s)")
+        for cp in csv_paths:
+            print(f"               - {os.path.basename(cp)}")
+    else:
+        print(f"  Data:        (none)")
     print()
 
     # ── Step 1: Clear workspace ──
@@ -203,7 +205,7 @@ def run(
 
     # ── Step 2: Copy files to raw_input/ ──
     _step(2, total_steps, "Copying inputs to raw_input/")
-    _copy_to_raw_input(txt_path, csv_path, query_dir)
+    _copy_to_raw_input(txt_path, csv_paths, query_dir)
 
     # ── Step 3: Convert raw → model inputs ──
     _step(3, total_steps, "Converting raw inputs to model inputs (raw_to_model)")
@@ -321,14 +323,14 @@ def main():
         description="Optima — end-to-end optimization pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Default behaviour: reads a .txt (required) and .csv (optional)\n"
+            "Default behaviour: reads a .txt (required) and all .csv files (optional)\n"
             "from data_upload/, runs the full pipeline, and writes results to\n"
             "current_query/final_output/.\n"
             "\n"
             "Examples:\n"
-            "  python main.py                                    # use data_upload/\n"
-            "  python main.py --desc problem.txt                 # explicit desc\n"
-            "  python main.py --desc problem.txt --data data.csv # desc + data\n"
+            "  python main.py                                                    # use data_upload/\n"
+            "  python main.py --desc problem.txt                                 # explicit desc\n"
+            "  python main.py --desc problem.txt --data a.csv b.csv c.csv        # desc + multiple CSVs\n"
         ),
     )
     parser.add_argument(
@@ -336,8 +338,8 @@ def main():
         help="Path to the problem description .txt file (overrides data_upload/)",
     )
     parser.add_argument(
-        "--data", type=str, default=None,
-        help="Path to the parameter data .csv file (optional, overrides data_upload/)",
+        "--data", type=str, nargs="*", default=None,
+        help="Path(s) to parameter data .csv file(s) (optional, overrides data_upload/)",
     )
     parser.add_argument(
         "--dir", type=str, default=QUERY_DIR,
@@ -350,11 +352,11 @@ def main():
     args = parser.parse_args()
 
     if args.data and not args.desc:
-        parser.error("--data requires --desc (cannot provide CSV without a description)")
+        parser.error("--data requires --desc (cannot provide CSVs without a description)")
 
     verdict = run(
         desc_path=args.desc,
-        data_path=args.data,
+        data_paths=args.data,
         query_dir=args.dir,
         no_archive=args.no_archive,
     )

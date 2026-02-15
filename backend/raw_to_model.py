@@ -3,17 +3,19 @@
 Convert raw user inputs into structured model inputs for the solvers.
 
 Reads:
-    current_query/raw_input/raw_desc.txt    - Natural-language problem description
-    current_query/raw_input/raw_params.csv  - (optional) Data CSV with problem parameters
+    current_query/raw_input/raw_desc.txt  - Natural-language problem description
+    current_query/raw_input/*.csv         - One or more data CSVs with problem parameters
 
 Writes:
-    current_query/model_input/desc.txt      - Cleaned problem description
-    current_query/model_input/params.json   - Structured parameters with values
+    current_query/model_input/desc.txt    - Cleaned problem description
+    current_query/model_input/params.json - Structured parameters with values (merged)
 
 Two modes (chosen automatically):
-    - CSV+Text mode: raw_desc.txt + raw_params.csv -> LLM maps CSV columns to params,
+    - CSV+Text mode: raw_desc.txt + one or more CSVs in raw_input/ -> LLM maps
+      columns across all CSVs to parameters (informed by the problem description),
       then a second pass extracts additional numeric constants from the description
-      that are NOT in the CSV (costs, rates, budgets, etc.)
+      that are NOT in the CSVs (costs, rates, budgets, etc.).  All parameters are
+      merged into a single params.json.
     - Text mode: raw_desc.txt only -> LLM extracts params from the description
 
 CLI usage:
@@ -28,6 +30,7 @@ Programmatic usage:
 from __future__ import annotations
 
 import argparse
+import glob as glob_mod
 import json
 import os
 import re
@@ -44,7 +47,6 @@ from optimus_pipeline.optimus_utils import get_response, extract_json_from_end
 RAW_INPUT_DIR = "raw_input"
 MODEL_INPUT_DIR = "model_input"
 RAW_DESC_FILE = "raw_desc.txt"
-RAW_PARAMS_FILE = "raw_params.csv"
 DEFAULT_MODEL = "gpt-4o"
 
 # Special data_column tokens for derived dimensions (not actual columns)
@@ -106,38 +108,54 @@ def _build_data_summary(df: pd.DataFrame, max_sample: int = 5) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _build_extraction_prompt(description: str, data_summary: str) -> str:
-    """Build the prompt that asks the LLM to identify optimization parameters."""
-    return f"""You are an optimization expert. A client has described their business problem and provided a dataset. Your job is to identify the PARAMETERS (given data) that will feed into the optimization model.
+def _build_multi_extraction_prompt(
+    description: str,
+    dataset_summaries: dict[str, str],
+) -> str:
+    """Build the prompt that asks the LLM to identify optimization parameters
+    across one or more datasets."""
+
+    # Combine per-dataset summaries
+    combined = []
+    for filename, summary in dataset_summaries.items():
+        combined.append(f'--- Dataset: "{filename}" ---\n{summary}')
+    datasets_block = "\n\n".join(combined)
+
+    n_datasets = len(dataset_summaries)
+    example_source = next(iter(dataset_summaries)) if dataset_summaries else "data.csv"
+
+    return f"""You are an optimization expert. A client has described their business problem and provided {n_datasets} dataset(s). Your job is to identify the PARAMETERS (given data) that will feed into the optimization model.
 
 Think like a consultant:
 - Parameters are quantities that appear in the math: coefficients, right-hand sides, capacities, demands, costs, lead times. They must be numeric (or dates converted to numbers).
 - ID columns (e.g. ProductId, StoreId) are usually for indexing/dimensions, not numeric parameters. Prefer deriving dimension sizes (e.g. NumberOfProducts) using the derived dimension tokens, and use actual data columns for StockLevels, Capacity, etc.
 - Only include parameters the formulation will use.
+- Parameters may come from ANY of the provided datasets. Use the correct data_source.
 
 Client description:
 -----
 {description}
 -----
 
-Dataset summary:
+Datasets:
 -----
-{data_summary}
+{datasets_block}
 -----
 
 Output a single JSON object with one key "parameters" whose value is an array of parameter specs. Each spec must have:
 - "symbol": camelCase (e.g. NumberOfProducts, StockLevels, WarehouseCapacity)
 - "definition": one short sentence describing the parameter
 - "type": "float" or "integer"
-- "shape": "[]" for scalar, "[N]" for vector (N = number of rows), "[N,M]" for matrix
-- "data_column": either (a) exact column name from the list above, or (b) a derived token: "{DERIVED_N_ROWS}" for total rows, or "{DERIVED_N_DISTINCT_PREFIX}<ColumnName>" for number of distinct values (e.g. "{DERIVED_N_DISTINCT_PREFIX}Product ID").
+- "shape": "[]" for scalar, "[N]" for vector (N = number of rows in the source dataset), "[N,M]" for matrix
+- "data_source": the exact filename of the dataset this parameter comes from (one of: {json.dumps(list(dataset_summaries.keys()))})
+- "data_column": either (a) exact column name from the source dataset, or (b) a derived token: "{DERIVED_N_ROWS}" for total rows in the source dataset, or "{DERIVED_N_DISTINCT_PREFIX}<ColumnName>" for number of distinct values (e.g. "{DERIVED_N_DISTINCT_PREFIX}Product ID").
 
 Examples:
-- Number of products: {{"symbol": "NumberOfProducts", "definition": "Number of products", "type": "integer", "shape": "[]", "data_column": "{DERIVED_N_ROWS}"}}
-- Stock level per product: {{"symbol": "StockLevels", "definition": "Current stock for each product", "type": "integer", "shape": "[N]", "data_column": "Stock Levels"}}
+- Number of products (from "{example_source}"): {{"symbol": "NumberOfProducts", "definition": "Number of products", "type": "integer", "shape": "[]", "data_source": "{example_source}", "data_column": "{DERIVED_N_ROWS}"}}
+- Stock level per product: {{"symbol": "StockLevels", "definition": "Current stock for each product", "type": "integer", "shape": "[N]", "data_source": "{example_source}", "data_column": "Stock Levels"}}
 - Do NOT include ProductId/StoreId as numeric parameters unless the formulation truly needs them as numbers.
 
-Output only the JSON object, no other text. Use exact column names as shown above."""
+Output only the JSON object, no other text. Use exact column names and dataset filenames as shown above."""
 
 
 # ---------------------------------------------------------------------------
@@ -291,23 +309,69 @@ def _simple_extract(df: pd.DataFrame) -> dict:
     return params
 
 
+def _multi_simple_extract(datasets: dict[str, pd.DataFrame]) -> dict:
+    """One parameter per column across all datasets, no LLM.  Used as fallback
+    if the LLM multi-extraction fails.  Symbol names are prefixed with a
+    sanitised version of the filename to avoid collisions."""
+    params = {}
+    for filename, df in datasets.items():
+        prefix = re.sub(r"\.csv$", "", filename, flags=re.IGNORECASE)
+        prefix = re.sub(r"[^\w]", "_", prefix).strip("_")
+        for col in df.columns:
+            name = re.sub(r"[^\w]", "_", str(col)).strip("_")
+            if not name:
+                name = "param"
+            full_name = f"{prefix}_{name}"
+            # Deduplicate
+            base = full_name
+            c = 0
+            while full_name in params:
+                c += 1
+                full_name = f"{base}_{c}"
+
+            series = df[col].dropna()
+            vals = series.tolist()
+            if not vals:
+                continue
+            is_int = pd.api.types.is_integer_dtype(series)
+            ptype = "integer" if is_int else "float"
+            if len(vals) == 1:
+                shape, value = [], _to_json_serializable(vals[0])
+            else:
+                shape, value = [len(vals)], _to_json_serializable(vals)
+
+            value = _ensure_numeric(value, ptype)
+            params[full_name] = {
+                "shape": shape,
+                "definition": f"From {filename}, column: {col}",
+                "type": ptype,
+                "value": value,
+            }
+    return params
+
+
 # ---------------------------------------------------------------------------
 # Expert extraction (LLM)
 # ---------------------------------------------------------------------------
 
 
-def _expert_extract(
+def _multi_expert_extract(
     description: str,
-    df: pd.DataFrame,
+    datasets: dict[str, pd.DataFrame],
     model: str = DEFAULT_MODEL,
 ) -> dict:
     """
-    Use an LLM to reason over the description + data, then produce
-    structured params with values filled from the DataFrame.
+    Use an LLM to reason over the description + one or more datasets,
+    then produce structured params with values filled from the correct
+    DataFrame.  Each parameter spec returned by the LLM includes a
+    ``data_source`` that identifies which CSV it comes from.
     """
-    n_rows = len(df)
-    data_summary = _build_data_summary(df)
-    prompt = _build_extraction_prompt(description, data_summary)
+    # Build per-dataset summaries
+    dataset_summaries: dict[str, str] = {}
+    for filename, df in datasets.items():
+        dataset_summaries[filename] = _build_data_summary(df)
+
+    prompt = _build_multi_extraction_prompt(description, dataset_summaries)
 
     response = get_response(prompt, model=model)
     raw = extract_json_from_end(response)
@@ -327,10 +391,33 @@ def _expert_extract(
         definition = item.get("definition", "")
         ptype = item.get("type", "float")
         shape_str = item.get("shape", "[]")
+        data_source = item.get("data_source")
         data_column = item.get("data_column")
 
-        if not symbol or data_column is None:
+        if not symbol or data_column is None or data_source is None:
             continue
+
+        # ── Resolve the source DataFrame ──
+        ds = str(data_source).strip()
+        if ds not in datasets:
+            # Try case-insensitive match
+            matched = None
+            for fn in datasets:
+                if fn.lower() == ds.lower():
+                    matched = fn
+                    break
+            if matched:
+                ds = matched
+            else:
+                print(
+                    f"  [warn] Skipping param '{symbol}': "
+                    f"unknown data_source '{data_source}'",
+                    file=sys.stderr,
+                )
+                continue
+
+        df = datasets[ds]
+        n_rows = len(df)
 
         # Clean symbol
         symbol = re.sub(r"[^\w]", "", str(symbol))
@@ -588,10 +675,13 @@ def run_pipeline(
     Convert raw_input/ into model_input/.
 
     Two modes (chosen automatically):
-        - CSV+Text mode: raw_desc.txt + raw_params.csv exist -> LLM maps CSV
-          columns to params, then a second pass extracts additional numeric
-          constants from the description that are NOT in the CSV.
-        - Text mode: only raw_desc.txt exists -> LLM extracts params from description
+        - CSV+Text mode: raw_desc.txt + one or more *.csv files in raw_input/
+          -> LLM maps columns across ALL CSVs to parameters (guided by the
+          problem description), then a second pass extracts additional numeric
+          constants from the description that are NOT in the CSVs.  Everything
+          is merged into a single params.json.
+        - Text mode: only raw_desc.txt exists -> LLM extracts params from
+          the description.
 
     Writes:
         {problem_dir}/model_input/desc.txt
@@ -605,14 +695,15 @@ def run_pipeline(
 
     # ---- Validate inputs ----
     desc_path = os.path.join(raw_dir, RAW_DESC_FILE)
-    csv_path = os.path.join(raw_dir, RAW_PARAMS_FILE)
-    has_csv = os.path.isfile(csv_path)
-
     if not os.path.isfile(desc_path):
         raise FileNotFoundError(
             f"Missing {desc_path}\n"
             f"Place your problem description in {raw_dir}/{RAW_DESC_FILE}"
         )
+
+    # Discover all CSVs in raw_input/
+    csv_paths = sorted(glob_mod.glob(os.path.join(raw_dir, "*.csv")))
+    has_csv = len(csv_paths) > 0
 
     # ---- Read description ----
     with open(desc_path) as f:
@@ -626,29 +717,34 @@ def run_pipeline(
     print(f"Description: {description[:150]}{'...' if len(description) > 150 else ''}")
 
     if has_csv:
-        # ---- CSV+Text mode: description + data ----
-        df = pd.read_csv(csv_path)
-        print(f"Data: {len(df)} rows, {len(df.columns)} columns from {RAW_PARAMS_FILE}")
-        print(f"Columns: {list(df.columns)}")
+        # ---- CSV+Text mode: description + one or more datasets ----
+        datasets: dict[str, pd.DataFrame] = {}
+        for csv_path in csv_paths:
+            filename = os.path.basename(csv_path)
+            df = pd.read_csv(csv_path)
+            datasets[filename] = df
+            print(f"Dataset '{filename}': {len(df)} rows, {len(df.columns)} columns")
+            print(f"  Columns: {list(df.columns)}")
+
         print()
-        print("Extracting parameters from CSV (expert mode)...")
+        print(f"Extracting parameters from {len(datasets)} dataset(s) (expert mode)...")
         try:
-            params = _expert_extract(description, df, model=model)
+            params = _multi_expert_extract(description, datasets, model=model)
             if not params:
                 raise ValueError("LLM returned zero parameters")
-            print(f"  CSV extraction: {len(params)} parameters.")
+            print(f"  Dataset extraction: {len(params)} parameters.")
         except Exception as e:
-            print(f"[warn] CSV extraction failed: {e}", file=sys.stderr)
+            print(f"[warn] Multi-dataset extraction failed: {e}", file=sys.stderr)
             print("Falling back to simple mode (one param per column).", file=sys.stderr)
-            params = _simple_extract(df)
+            params = _multi_simple_extract(datasets)
 
-        # ---- Supplement: extract text-only params the CSV missed ----
+        # ---- Supplement: extract text-only params the CSVs missed ----
         print("Extracting additional parameters from description text...")
         supplement = _supplement_extract(
             description, list(params.keys()), model=model
         )
         if supplement:
-            # Merge: CSV params take priority, supplement fills gaps
+            # Merge: dataset params take priority, supplement fills gaps
             added = []
             for sym, spec in supplement.items():
                 if sym not in params:
@@ -657,12 +753,12 @@ def run_pipeline(
             if added:
                 print(f"  Text supplement: +{len(added)} parameters: {added}")
             else:
-                print("  Text supplement: no new parameters (all covered by CSV).")
+                print("  Text supplement: no new parameters (all covered by datasets).")
         else:
             print("  Text supplement: no additional parameters found.")
     else:
         # ---- Text mode: description only ----
-        print("No CSV found. Extracting parameters directly from description...")
+        print("No CSVs found. Extracting parameters directly from description...")
         print()
         params = _desc_only_extract(description, model=model)
         if params:
@@ -670,7 +766,7 @@ def run_pipeline(
         else:
             raise RuntimeError(
                 "LLM could not extract any parameters from the description. "
-                "Try providing a raw_params.csv with your data."
+                "Try providing one or more .csv files in raw_input/."
             )
 
     if not params:
@@ -702,7 +798,7 @@ def run_pipeline(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Convert raw_input/ (desc + CSV) into model_input/ (desc.txt + params.json)"
+        description="Convert raw_input/ (desc + one or more CSVs) into model_input/ (desc.txt + params.json)"
     )
     parser.add_argument(
         "--dir", type=str, default="current_query",

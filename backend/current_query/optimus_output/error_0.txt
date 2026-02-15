@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/hindy/Desktop/OptiMUS/backend/current_query/optimus_output/code.py", line 58, in <module>
+    model.addConstr(sum(OperationalHours[t] * TimeSlotSelected[i,t] for t in range(24)) == 1)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/hindy/Desktop/OptiMUS/backend/current_query/optimus_output/code.py", line 58, in <genexpr>
+    model.addConstr(sum(OperationalHours[t] * TimeSlotSelected[i,t] for t in range(24)) == 1)
+                        ^^^^^^^^^^^^^^^^
+NameError: name 'OperationalHours' is not defined

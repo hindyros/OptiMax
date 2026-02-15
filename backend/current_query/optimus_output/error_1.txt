@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/Users/hindy/Desktop/OptiMUS/backend/current_query/optimus_output/code_1.py", line 97, in <module>
+    transfer_timing_penalty = quicksum(HasTransfer[i] * ((TransferTimes[i] % 24 - PreferredTransferTime) ** 2) for i in range(140))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "src/gurobipy/_helpers.pyx", line 41, in gurobipy._helpers.quicksum
+  File "/Users/hindy/Desktop/OptiMUS/backend/current_query/optimus_output/code_1.py", line 97, in <genexpr>
+    transfer_timing_penalty = quicksum(HasTransfer[i] * ((TransferTimes[i] % 24 - PreferredTransferTime) ** 2) for i in range(140))
+                                                          ~~~~~~~~~~~~~~~~~^~~~
+TypeError: unsupported operand type(s) for %: 'Var' and 'int'

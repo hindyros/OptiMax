@@ -1,0 +1,1 @@
+We often keep patients in the ICU longer than necessary because transfers to step-down or wards happen late in the day. That blocks beds for new admissions. I want to shift transfers earlier (when possible) so ICU beds free up sooner.

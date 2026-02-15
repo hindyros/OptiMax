@@ -1,0 +1,55 @@
+{
+    "description": "We often keep patients in the ICU longer than necessary because transfers to step-down or wards happen late in the day. That blocks beds for new admissions. I want to shift transfers earlier (when possible) so ICU beds free up sooner.",
+    "parameters": {
+        "NumberOfPatients": {
+            "shape": [],
+            "definition": "Total number of rows in admissions dataset",
+            "type": "integer"
+        },
+        "NumberOfICUStays": {
+            "shape": [],
+            "definition": "Total number of rows in icustays dataset",
+            "type": "integer"
+        },
+        "NumberOfTransfers": {
+            "shape": [],
+            "definition": "Total number of rows in transfers dataset",
+            "type": "integer"
+        },
+        "ICULengthOfStay": {
+            "shape": [
+                140
+            ],
+            "definition": "Length of stay in ICU for each admission",
+            "type": "float"
+        },
+        "ICUInTimes": {
+            "shape": [
+                140
+            ],
+            "definition": "In-time for each ICU stay",
+            "type": "integer"
+        },
+        "ICUOutTimes": {
+            "shape": [
+                140
+            ],
+            "definition": "Out-time for each ICU stay",
+            "type": "integer"
+        },
+        "TransferInTimes": {
+            "shape": [
+                1190
+            ],
+            "definition": "In-time for each transfer event",
+            "type": "integer"
+        },
+        "TransferOutTimes": {
+            "shape": [
+                1190
+            ],
+            "definition": "Out-time for each transfer event",
+            "type": "integer"
+        }
+    }
+}
