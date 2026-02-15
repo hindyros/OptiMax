@@ -5,11 +5,17 @@ FROM python:3.10-slim as python-base
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
+    ca-certificates \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
+# Install Node.js 18.x manually (avoids apt permission issues)
+ENV NODE_VERSION=18.20.6
+RUN curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz -o node.tar.xz \
+    && tar -xf node.tar.xz -C /usr/local --strip-components=1 \
+    && rm node.tar.xz \
+    && node --version \
+    && npm --version
 
 # Set working directory
 WORKDIR /app
