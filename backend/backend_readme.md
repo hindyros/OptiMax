@@ -223,7 +223,7 @@ The Q4_K_M model fits in 24GB VRAM. An **nginx** reverse proxy on port 80 forwar
 cd ~/llama.cpp && nohup ./build/bin/llama-server \
   --model ~/optimind-sft-Q4_K_M.gguf \
   --host 0.0.0.0 --port 30000 \
-  --n-gpu-layers 99 --ctx-size 4096 -fa on \
+  --n-gpu-layers 99 --ctx-size 35000 -fa on \
   > ~/server.log 2>&1 &
 ```
 
