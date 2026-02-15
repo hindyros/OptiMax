@@ -10,9 +10,17 @@ import OpenAI from 'openai';
 // Force dynamic rendering - don't pre-render during build
 export const dynamic = 'force-dynamic';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize OpenAI client (only when needed, not at module load)
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
 
 export async function POST(request: NextRequest) {
   console.log('\n[API] POST /api/summarize');
@@ -31,7 +39,7 @@ export async function POST(request: NextRequest) {
     console.log('[API] Generating summary for report...');
 
     // Call OpenAI to generate a concise summary
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {

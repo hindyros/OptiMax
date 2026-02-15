@@ -7,10 +7,17 @@
 
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize OpenAI client (only when needed, not at module load)
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
 
 /**
  * System prompt for LLM refinement
@@ -68,7 +75,7 @@ export async function startRefinement(initialDescription: string): Promise<{
   console.log('[LLM] Starting refinement conversation...');
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: REFINEMENT_SYSTEM_PROMPT },
@@ -257,7 +264,7 @@ ${refinedDescription}
 Return ONLY valid JSON, no additional text.`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: 'You are a parameter extraction expert.' },
@@ -322,7 +329,7 @@ export async function startBaselineAssessment(problemDescription: string): Promi
   console.log('[LLM] Starting baseline assessment...');
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: BASELINE_SYSTEM_PROMPT },
