@@ -28,7 +28,8 @@ services:
       # Node environment
       - key: NODE_ENV
         value: production
-    disk:
-      name: optimate-data
-      mountPath: /app/backend
-      sizeGB: 10
+    # Persistent disk (paid feature - uncomment when sponsor credits available)
+    # disk:
+    #   name: optimate-data
+    #   mountPath: /app/backend
+    #   sizeGB: 10
