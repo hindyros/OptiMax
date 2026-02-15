@@ -1,0 +1,10 @@
+anthropic
+openai
+groq
+python-dotenv
+pandas
+numpy
+gurobipy
+openpyxl
+langchain_chroma
+langchain_openai

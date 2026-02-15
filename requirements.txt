@@ -1,9 +1,0 @@
-anthropic
-openai
-groq
-python-dotenv
-pandas
-numpy
-gurobipy
-langchain_chroma
-langchain_openai

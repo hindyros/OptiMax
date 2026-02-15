@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Query history (local archives of past runs)
+query_history/
+
+# Environment / secrets (never commit real keys)
+.env
+api_keys.env
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Upload folder (keep structure, ignore user data)
+data_upload/*
+!data_upload/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db

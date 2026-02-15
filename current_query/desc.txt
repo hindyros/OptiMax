@@ -1,1 +1,0 @@
-A factory produces two products A and B. Product A yields $5 profit per unit and product B yields $4 profit per unit. Each unit of A requires 2 hours of labor and 1 unit of raw material. Each unit of B requires 1 hour of labor and 2 units of raw material. The factory has 100 hours of labor and 80 units of raw material available. Maximize total profit.
