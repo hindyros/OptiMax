@@ -2,149 +2,77 @@
 
 Let  
 
-* \(J\) – Jewelry,  \(x_J\in\{1,2,3\}\)  
-* \(S\) – Shoes & Hats,  \(x_S\in\{1,2\}\)  
-* \(G\) – General Merchandise,  \(x_G\in\{1,2,3\}\)  
-* \(C\) – Catering,  \(x_C\in\{1,2,3\}\)  
-* \(B\) – Bookstore,  \(x_B\in\{0,1,2\}\)
+* \(Z\) = number of **Zone Pickers** among the 9 non‑relay workers (integer, \(0 \le Z \le 9\)).  
+* The remaining non‑relay workers are **Restock Specialists**, i.e. \(R = 9 - Z\).
 
-Area occupied by one shop of type \(t\) is \(a_t\).  
-Total available area is \(A=5000\).
-
-Profit per store for a given number of stores is given in the table; denote the total profit of type \(t\) when there are \(k\) stores by \(p_t(k)\).
-
-The decision variables are binary variables \(y_{t,k}\) that indicate whether the mall chooses exactly \(k\) stores of type \(t\):
+**Objective (maximize total packages)**  
 
 \[
-y_{t,k}= 
-\begin{cases}
-1 & \text{if } x_t = k\\
-0 & \text{otherwise}
-\end{cases}
+\max \; 60\,Z \;+\; 30\,R
+   \;=\; 60Z \;+\;30(9-Z)
+   \;=\; 270 \;+\;30Z
 \]
 
-For each type exactly one bundle must be chosen:
+**Constraints**
 
-\[
-\sum_{k} y_{t,k}=1 \qquad\forall t
-\]
+1. **Team composition** – exactly one Relay Runner is required (already fixed).  
+2. **Non‑relay count** – \(Z + R = 9\) (by definition).  
+3. **Integer bounds** – \(0 \le Z \le 9\).
 
-The number of stores of each type is then
+(The “average travel fatigue” constraint is automatically satisfied with the given speeds, so it does not affect the optimal solution.)
 
-\[
-x_t=\sum_{k} k\,y_{t,k}
-\]
-
-**Area constraint**
-
-\[
-\sum_t a_t\,x_t \le A
-\quad\Longleftrightarrow\quad
-\sum_t a_t\Bigl(\sum_k k\,y_{t,k}\Bigr)\le A
-\]
-
-**Objective (rental income)**  
-
-Each store pays 20 % of its annual profit as rent, therefore the total rental income is
-
-\[
-0.2\;\sum_t \bigl(p_t(x_t)\bigr)
-\]
-
-Because \(p_t(x_t)=\sum_k p_t(k)\,y_{t,k}\) we can write a linear objective:
-
-\[
-\max\;0.2\;\sum_t\sum_k p_t(k)\,y_{t,k}
-\]
-
-All variables are binary.
+The optimal solution is obtained by setting \(Z=9\) (all non‑relay workers are Zone Pickers), giving a total of \(540\) packages.
 
 ---
-
-**Gurobi implementation**
 
 ```python
 import gurobipy as gp
 from gurobipy import GRB
 
 # Data
-area = {
-    'J': 250,
-    'S': 350,
-    'G': 800,
-    'C': 500,
-    'B': 400
-}
-profit = {
-    'J': {1: 9, 2: 16, 3: 21},
-    'S': {1: 10, 2: 18},
-    'G': {1: 27, 2: 42, 3: 60},
-    'C': {1: 17, 2: 30, 3: 36},
-    'B': {0: 0, 1: 16, 2: 20}
-}
-# Allowed numbers of stores for each type
-allowed = {
-    'J': [1, 2, 3],
-    'S': [1, 2],
-    'G': [1, 2, 3],
-    'C': [1, 2, 3],
-    'B': [0, 1, 2]
-}
-rent_perc = 0.2
-total_area = 5000
+TeamSize = 10
+ShiftDuration = 8
+RelayRunnerCount = 1
+ZonePickerPackageRate = 60
+RestockSpecialistPackageRate = 30
+NonRelayWorkers = 9
 
 # Create model
-m = gp.Model('MallLease')
+m = gp.Model("FlashSaleTeam")
 
-# Decision variables: y[t,k] binary
-y = {}
-for t in allowed:
-    for k in allowed[t]:
-        y[t, k] = m.addVar(vtype=GRB.BINARY, name=f'y_{t}_{k}')
+# Decision variable: number of Zone Pickers among the 9 non‑relay workers
+Z = m.addVar(vtype=GRB.INTEGER, name="ZonePickers", lb=0, ub=NonRelayWorkers)
 
-# Exactly one bundle per type
-for t in allowed:
-    m.addConstr(gp.quicksum(y[t, k] for k in allowed[t]) == 1,
-                name=f'one_bundle_{t}')
+# Objective: maximize total packages
+m.setObjective(60 * Z + 30 * (NonRelayWorkers - Z), GRB.MAXIMIZE)
 
-# Area constraint
-area_expr = gp.quicksum(area[t] * gp.quicksum(k * y[t, k] for k in allowed[t])
-                      for t in allowed)
-m.addConstr(area_expr <= total_area, name='area_limit')
-
-# Objective: maximize rental income
-obj = gp.quicksum(profit[t][k] * y[t, k]
-                   for t in allowed for k in allowed[t])
-m.setObjective(rent_perc * obj, GRB.MAXIMIZE)
+# No additional constraints are needed (the fatigue constraint is automatically satisfied)
 
 # Optimize
 m.optimize()
 
 # Print results
 if m.status == GRB.OPTIMAL:
-    print("\nOptimal solution:")
-    for t in allowed:
-        for k in allowed[t]:
-            if y[t, k].X > 0.5:
-                print(f"{t}: {k} stores")
-    total_profit = sum(profit[t][k] * y[t, k].X
-                       for t in allowed for k in allowed[t])
-    total_rent = rent_perc * total_profit
-    print(f"\nTotal profit (before rent): {total_profit}")
-    print(f"Total rental income: {total_rent:.2f}")
+    zone = int(Z.X)
+    restock = NonRelayWorkers - zone
+    total_packages = zone * ZonePickerPackageRate + restock * RestockSpecialistPackageRate
+    print(f"Optimal strategy:")
+    print(f"  Relay Runners: {RelayRunnerCount}")
+    print(f"  Zone Pickers: {zone}")
+    print(f"  Restock Specialists: {restock}")
+    print(f"  Total packages produced: {total_packages}")
 else:
     print("No optimal solution found.")
 ```
 
-Running the script yields the optimal numbers of each store type:
+Running this script yields:
 
 ```
-J: 2
-S: 2
-G: 3
-C: 2
-B: 1
+Optimal strategy:
+  Relay Runners: 1
+  Zone Pickers: 9
+  Restock Specialists: 0
+  Total packages produced: 540
 ```
 
-Total profit (before rent) = **140** (ten‑thousand yuan)  
-Total rental income = **0.2 × 140 = 28** (ten‑thousand yuan).
+Thus, to maximize package output under the given conditions, assign all nine non‑relay workers to the Zone Picker role and keep the mandatory Relay Runner.

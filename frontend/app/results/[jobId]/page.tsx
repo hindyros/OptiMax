@@ -20,6 +20,9 @@ import rehypeKatex from 'rehype-katex';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTheme } from 'next-themes';
+import { generateHeyGenVideo } from '@/lib/heygen-api';
 import 'katex/dist/katex.min.css';
 
 interface OptimizationResult {
@@ -43,10 +46,15 @@ export default function ResultsPage() {
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [showAIPresentation, setShowAIPresentation] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [videoGenerationProgress, setVideoGenerationProgress] = useState<string>('');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  // Summary state
+  const [summary, setSummary] = useState<string>('');
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [showFullReport, setShowFullReport] = useState(false);
 
   /**
    * Fetch results on mount
@@ -65,15 +73,48 @@ export default function ResultsPage() {
 
         setResult(data);
         setIsLoading(false);
-      } catch (err: any) {
+
+        // Generate summary after loading results
+        generateSummary(data.report_content || data.explanation);
+      } catch (err) {
         console.error('Fetch results error:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'Failed to fetch results');
         setIsLoading(false);
       }
     };
 
     fetchResults();
   }, [jobId]);
+
+  /**
+   * Generate AI summary of the report
+   */
+  const generateSummary = async (reportContent: string) => {
+    if (!reportContent) return;
+
+    setIsLoadingSummary(true);
+
+    try {
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ report: reportContent }),
+      });
+
+      const data = await response.json();
+
+      if (data.summary) {
+        setSummary(data.summary);
+      }
+    } catch (err) {
+      console.error('Summary generation error:', err);
+      setSummary('Summary unavailable. Please review the detailed report below.');
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  };
 
   /**
    * Download report as PDF
@@ -107,99 +148,58 @@ export default function ResultsPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (err: any) {
+    } catch (err) {
       console.error('PDF generation error:', err);
       alert('Failed to generate PDF. Please try again.');
     }
   };
 
   /**
-   * Generate HeyGen AI presentation
+   * Generate HeyGen AI presentation using the library
    */
   const handleGenerateAIPresentation = async () => {
-    if (!result) return;
+    if (!result || !summary) {
+      alert('Please wait for the summary to be generated first.');
+      return;
+    }
 
     setIsGeneratingVideo(true);
+    setVideoGenerationProgress('Preparing...');
 
     try {
-      // Create a concise script from the explanation (strip markdown formatting)
-      const plainText = result.explanation
-        .replace(/\*\*/g, '')  // Remove bold
-        .replace(/\n/g, ' ')    // Replace newlines with spaces
-        .slice(0, 500);         // Limit to 500 chars
+      // Use the LLM-generated summary for the video script
+      // Remove markdown formatting for cleaner speech
+      const cleanSummary = summary
+        .replace(/\*\*/g, '')        // Remove bold
+        .replace(/\*/g, '')           // Remove italics
+        .replace(/`/g, '')            // Remove inline code
+        .replace(/#+\s/g, '')         // Remove headers
+        .replace(/\n\n/g, '. ')       // Replace double newlines with periods
+        .replace(/\n/g, ' ')          // Replace single newlines with spaces
+        .replace(/\s+/g, ' ')         // Normalize whitespace
+        .trim();
 
-      const script = `Here are your optimization results. ${plainText}`;
+      // Create engaging intro and use the summary
+      const script = `Hello! Let me walk you through your optimization results. ${cleanSummary}. Thank you for using OptiMATE!`;
 
-      // Call our API route (server-side) to generate video
-      const response = await fetch('/api/heygen/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ script }),
+      console.log('[HeyGen] Generating video with script:', script);
+
+      // Use the library's clean API with progress callback
+      const videoUrl = await generateHeyGenVideo(script, (progress) => {
+        console.log('[HeyGen] Progress:', progress);
+        setVideoGenerationProgress(progress);
       });
 
-      const data = await response.json();
+      console.log('[HeyGen] ✓ Video ready:', videoUrl);
+      setVideoUrl(videoUrl);
+      setShowAIPresentation(true);
+      setVideoGenerationProgress('');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate video');
-      }
-
-      // Extract video ID from response (HeyGen API v2 structure)
-      const videoId = data.data?.video_id || data.video_id;
-
-      if (videoId) {
-        console.log('HeyGen video generation started:', videoId);
-
-        // Poll for video completion (HeyGen videos take time to generate)
-        const pollForVideo = async (videoId: string) => {
-          const maxAttempts = 60; // Poll for up to 5 minutes (5s intervals)
-          let attempts = 0;
-
-          const checkStatus = async (): Promise<boolean> => {
-            try {
-              const statusResponse = await fetch(`/api/heygen/status?video_id=${videoId}`);
-              const statusData = await statusResponse.json();
-
-              if (!statusResponse.ok) {
-                throw new Error(statusData.error || 'Failed to check video status');
-              }
-
-              // Check for completed video (handle both v1 and v2 response structures)
-              const status = statusData.data?.status || statusData.status;
-              const videoUrl = statusData.data?.video_url || statusData.video_url;
-
-              if (status === 'completed' && videoUrl) {
-                setVideoUrl(videoUrl);
-                setShowAIPresentation(true);
-                return true;
-              } else if (status === 'failed') {
-                throw new Error('Video generation failed');
-              }
-
-              // Still processing
-              attempts++;
-              if (attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-                return checkStatus();
-              } else {
-                throw new Error('Video generation timed out');
-              }
-            } catch (err) {
-              throw err;
-            }
-          };
-
-          return checkStatus();
-        };
-
-        await pollForVideo(videoId);
-      } else {
-        throw new Error('No video ID returned from HeyGen API');
-      }
-    } catch (err: any) {
-      console.error('HeyGen generation error:', err);
-      alert(`Failed to generate AI presentation: ${err.message}\n\nPlease check:\n1. HeyGen API key is valid\n2. You have credits in your HeyGen account\n3. Check console for more details`);
+    } catch (err) {
+      console.error('[HeyGen] Generation error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Failed to generate AI presentation: ${errorMessage}\n\nPlease check:\n1. HeyGen API key is valid (NEXT_PUBLIC_HEYGEN_API_KEY in .env.local)\n2. You have credits in your HeyGen account\n3. Check browser console for more details`);
+      setVideoGenerationProgress('');
     } finally {
       setIsGeneratingVideo(false);
     }
@@ -207,7 +207,7 @@ export default function ResultsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-surface/30 particle-bg">
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-app-gradient">
         <div className="text-center">
           <div className="text-4xl sm:text-5xl mb-4 animate-pulse">📊</div>
           <p className="text-foreground-dim text-sm sm:text-base">Loading results...</p>
@@ -218,11 +218,7 @@ export default function ResultsPage() {
 
   if (error || !result) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
-        {/* Floating orbs */}
-        <div className="absolute top-20 left-10 w-64 h-64 bg-error/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-error/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden bg-app-gradient">
         <div className="max-w-md w-full glass-card gradient-border rounded-2xl p-6 sm:p-8 text-center relative z-10">
           <div className="text-5xl mb-4">❌</div>
           <h2 className="text-2xl font-bold text-error mb-4">Failed to Load Results</h2>
@@ -244,12 +240,7 @@ export default function ResultsPage() {
     .map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
-      {/* Animated floating orbs */}
-      <div className="absolute top-20 left-10 w-64 h-64 bg-success/10 rounded-full blur-3xl animate-float" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-      <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }} />
-
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 relative overflow-hidden bg-app-gradient">
       <div className="max-w-xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto space-y-6 sm:space-y-8 relative z-10">
         {/* Header */}
         <motion.div
@@ -259,12 +250,10 @@ export default function ResultsPage() {
         >
           <motion.div
             className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 inline-block"
-            animate={{ scale: [1, 1.1, 1], rotate: [0, 10, -10, 0] }}
-            transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
           >
             ✨
           </motion.div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold gradient-text neon-glow mb-2 sm:mb-3">Optimization Complete</h1>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 sm:mb-3" style={{ color: '#e76a28'}}>Optimization Complete</h1>
           <p className="text-foreground-dim text-sm sm:text-base md:text-lg">
             Your optimal solution has been found and verified.
           </p>
@@ -315,29 +304,67 @@ export default function ResultsPage() {
           </motion.div>
         )}
 
-        {/* Full Report (Display report.md content with all sections) */}
+        {/* Executive Summary Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.25 }}
           className="glass-card gradient-border rounded-2xl p-4 sm:p-6 md:p-8"
         >
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-semibold gradient-text">Optimization Report</h2>
-            <button
-              onClick={handleDownloadPDF}
-              className="btn-gradient px-3 sm:px-4 py-2 text-background text-sm sm:text-base font-semibold rounded-lg shadow-lg flex items-center gap-2 card-hover w-full sm:w-auto justify-center"
-              title="Download report as PDF"
-            >
-              <span>📄</span>
-              <span className="hidden sm:inline">Download PDF</span>
-              <span className="sm:hidden">PDF</span>
-            </button>
-          </div>
-          <div className="prose prose-invert max-w-none">
-            <MarkdownRenderer content={result.report_content || result.explanation} />
-          </div>
+          <h2 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6" style={{ color: '#e76a28' }}>
+            Executive Summary
+          </h2>
+
+          {isLoadingSummary ? (
+            <div className="flex items-center gap-3 text-foreground-dim">
+              <span className="inline-block animate-spin text-xl">⚙️</span>
+              <span className="text-sm sm:text-base">Generating summary...</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="prose prose-invert max-w-none text-foreground-dim text-sm sm:text-base leading-relaxed">
+                <ReactMarkdown>
+                  {summary}
+                </ReactMarkdown>
+              </div>
+
+              <button
+                onClick={() => setShowFullReport(!showFullReport)}
+                className="flex items-center gap-2 text-primary hover:text-accent transition-colors text-sm sm:text-base font-semibold mt-4"
+              >
+                <span className="text-lg">{showFullReport ? '▼' : '▶'}</span>
+                <span>{showFullReport ? 'Hide' : 'View'} Detailed Report</span>
+              </button>
+            </div>
+          )}
         </motion.div>
+
+        {/* Full Report - Collapsible */}
+        {showFullReport && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="glass-card gradient-border rounded-2xl p-4 sm:p-6 md:p-8"
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
+              <h2 className="text-xl sm:text-2xl font-semibold gradient-text">Detailed Optimization Report</h2>
+              <button
+                onClick={handleDownloadPDF}
+                className="btn-gradient px-3 sm:px-4 py-2 text-background text-sm sm:text-base font-semibold rounded-lg shadow-lg flex items-center gap-2 card-hover w-full sm:w-auto justify-center"
+                title="Download report as PDF"
+              >
+                <span>📄</span>
+                <span className="hidden sm:inline">Download PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </button>
+            </div>
+            <div className="prose prose-invert max-w-none">
+              <MarkdownRenderer content={result.report_content || result.explanation} />
+            </div>
+          </motion.div>
+        )}
 
         {/* AI Presentation Section */}
         {showAIPresentation && videoUrl && (
@@ -389,7 +416,7 @@ export default function ResultsPage() {
               {isGeneratingVideo ? (
                 <>
                   <span className="inline-block animate-spin mr-2">⚙️</span>
-                  Generating AI Presenter...
+                  {videoGenerationProgress || 'Generating AI Presenter...'}
                 </>
               ) : (
                 <>🎬 Get AI Presentation</>
@@ -407,6 +434,9 @@ export default function ResultsPage() {
  * Properly renders report.md with LaTeX, code highlighting, and tables
  */
 function MarkdownRenderer({ content }: { content: string }) {
+  const { theme } = useTheme();
+  const codeTheme = theme === 'light' ? vs : vscDarkPlus;
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkMath, remarkGfm]}
@@ -476,7 +506,12 @@ function MarkdownRenderer({ content }: { content: string }) {
         ),
 
         // Code blocks and inline code
-        code: ({ node, inline, className, children, ...props }: any) => {
+        code: ({ node, inline, className, children, ...props }: {
+          node?: any;
+          inline?: boolean;
+          className?: string;
+          children?: React.ReactNode;
+        }) => {
           const match = /language-(\w+)/.exec(className || '');
           const language = match ? match[1] : 'Python';
           const content = String(children).replace(/\n$/, '');
@@ -487,7 +522,7 @@ function MarkdownRenderer({ content }: { content: string }) {
               <div className="my-4 rounded-lg overflow-hidden">
                 <SyntaxHighlighter
                   language={language}
-                  style={vscDarkPlus}
+                  style={codeTheme}
                   customStyle={{
                     margin: 0,
                     borderRadius: '8px',
@@ -560,25 +595,15 @@ function MetricCard({ label, value, delay }: { label: string; value: number; del
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay }}
-      whileHover={{ y: -5, scale: 1.02 }}
-      className="glass-card gradient-border rounded-2xl p-4 sm:p-6 card-hover group relative overflow-hidden"
+      className="glass-card gradient-border rounded-2xl p-4 sm:p-6 group relative overflow-hidden hover:border-primary/30 transition-all"
       title={getTooltip(label)}
     >
-      {/* Animated glow on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
       <div className="relative z-10">
         <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
           <p className="text-xs sm:text-sm text-foreground-dim">{label}</p>
-          <span className="text-xs text-foreground-dim opacity-0 group-hover:opacity-100 transition-opacity">
-            ℹ️
-          </span>
         </div>
-        <p className="text-2xl sm:text-3xl md:text-4xl font-bold gradient-text">{value.toLocaleString()}</p>
+        <p className="text-2xl sm:text-3xl md:text-4xl font-bold" style={{ color: '#e76a28' }}>{value.toLocaleString()}</p>
       </div>
-
-      {/* Corner accent */}
-      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/20 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
     </motion.div>
   );
 }

@@ -1,215 +1,90 @@
 {
-    "description": "Changjiang Comprehensive Shopping Mall has 5000 m\u00b2 of space for lease and plans to attract the following 5 types of stores as tenants. The table below shows the area occupied by each type of store for one shop, the minimum and maximum number of shops for each type within the mall, and the expected annual profit (in ten thousand yuan) per store for different numbers of stores. Each store pays 20% of its annual profit as rent to the mall. Question: How many of each type of store should the mall lease to maximize total rental income? Table 5-12 | Code | Store Type | Area per Shop / m\u00b2 | Min | Max | 1 Store | 2 Stores | 3 Stores | |------|------------|--------------------|-----|-----|---------|----------|----------| | 1 | Jewelry | 250 | 1 | 3 | 9 | 8 | 7 | | 2 | Shoes & Hats | 350 | 1 | 2 | 10 | 9 | - | | 3 | General Merchandise | 800 | 1 | 3 | 27 | 21 | 20 | | 4 | Bookstore | 400 | 0 | 2 | 16 | 10 | - | | 5 | Catering | 500 | 1 | 3 | 17 | 15 | 12 |",
+    "description": "We have a 10-person team for an 8-hour flash sale shift where we must maximize total package output while keeping the team's average travel fatigue under 10 miles per day. One worker must be the mandatory Relay Runner (4.0 mph, 0 packages/hr), and the remaining 9 must be split between Zone Pickers (2.5 mph, 60 packages/hr) and Restock Specialists (1.5 mph, 30 packages/hr). Find me the optimal strategy to get the maximum output package output.",
     "parameters": {
-        "TotalSpace": {
+        "TeamSize": {
             "shape": [],
-            "definition": "Total available space for lease in the mall",
+            "definition": "Total number of workers in the team",
             "type": "integer"
         },
-        "RentPercentage": {
+        "ShiftDuration": {
             "shape": [],
-            "definition": "Percentage of annual profit paid as rent",
+            "definition": "Duration of the flash sale shift in hours",
+            "type": "integer"
+        },
+        "MaxAverageTravelFatigue": {
+            "shape": [],
+            "definition": "Maximum allowed average travel fatigue in miles per day",
+            "type": "integer"
+        },
+        "RelayRunnerCount": {
+            "shape": [],
+            "definition": "Mandatory number of Relay Runners",
+            "type": "integer"
+        },
+        "RelayRunnerSpeed": {
+            "shape": [],
+            "definition": "Speed of Relay Runner in miles per hour",
             "type": "float"
         },
-        "AreaJewelry": {
+        "RelayRunnerPackageRate": {
             "shape": [],
-            "definition": "Area occupied by one jewelry shop",
+            "definition": "Package processing rate for Relay Runner in packages per hour",
             "type": "integer"
         },
-        "AreaShoesHats": {
+        "ZonePickerSpeed": {
             "shape": [],
-            "definition": "Area occupied by one shoes & hats shop",
+            "definition": "Speed of Zone Picker in miles per hour",
+            "type": "float"
+        },
+        "ZonePickerPackageRate": {
+            "shape": [],
+            "definition": "Package processing rate for Zone Picker in packages per hour",
             "type": "integer"
         },
-        "AreaGeneralMerch": {
+        "RestockSpecialistSpeed": {
             "shape": [],
-            "definition": "Area occupied by one general merchandise shop",
+            "definition": "Speed of Restock Specialist in miles per hour",
+            "type": "float"
+        },
+        "RestockSpecialistPackageRate": {
+            "shape": [],
+            "definition": "Package processing rate for Restock Specialist in packages per hour",
             "type": "integer"
         },
-        "AreaBookstore": {
+        "NonRelayWorkers": {
             "shape": [],
-            "definition": "Area occupied by one bookstore",
-            "type": "integer"
-        },
-        "AreaCatering": {
-            "shape": [],
-            "definition": "Area occupied by one catering shop",
-            "type": "integer"
-        },
-        "MinJewelry": {
-            "shape": [],
-            "definition": "Minimum number of jewelry shops",
-            "type": "integer"
-        },
-        "MinShoesHats": {
-            "shape": [],
-            "definition": "Minimum number of shoes & hats shops",
-            "type": "integer"
-        },
-        "MinGeneralMerch": {
-            "shape": [],
-            "definition": "Minimum number of general merchandise shops",
-            "type": "integer"
-        },
-        "MinBookstore": {
-            "shape": [],
-            "definition": "Minimum number of bookstores",
-            "type": "integer"
-        },
-        "MinCatering": {
-            "shape": [],
-            "definition": "Minimum number of catering shops",
-            "type": "integer"
-        },
-        "MaxJewelry": {
-            "shape": [],
-            "definition": "Maximum number of jewelry shops",
-            "type": "integer"
-        },
-        "MaxShoesHats": {
-            "shape": [],
-            "definition": "Maximum number of shoes & hats shops",
-            "type": "integer"
-        },
-        "MaxGeneralMerch": {
-            "shape": [],
-            "definition": "Maximum number of general merchandise shops",
-            "type": "integer"
-        },
-        "MaxBookstore": {
-            "shape": [],
-            "definition": "Maximum number of bookstores",
-            "type": "integer"
-        },
-        "MaxCatering": {
-            "shape": [],
-            "definition": "Maximum number of catering shops",
-            "type": "integer"
-        },
-        "ProfitJewelry1": {
-            "shape": [],
-            "definition": "Annual profit for jewelry shop when 1 store",
-            "type": "integer"
-        },
-        "ProfitJewelry2": {
-            "shape": [],
-            "definition": "Annual profit for jewelry shop when 2 stores",
-            "type": "integer"
-        },
-        "ProfitJewelry3": {
-            "shape": [],
-            "definition": "Annual profit for jewelry shop when 3 stores",
-            "type": "integer"
-        },
-        "ProfitShoesHats1": {
-            "shape": [],
-            "definition": "Annual profit for shoes & hats shop when 1 store",
-            "type": "integer"
-        },
-        "ProfitShoesHats2": {
-            "shape": [],
-            "definition": "Annual profit for shoes & hats shop when 2 stores",
-            "type": "integer"
-        },
-        "ProfitGeneralMerch1": {
-            "shape": [],
-            "definition": "Annual profit for general merchandise shop when 1 store",
-            "type": "integer"
-        },
-        "ProfitGeneralMerch2": {
-            "shape": [],
-            "definition": "Annual profit for general merchandise shop when 2 stores",
-            "type": "integer"
-        },
-        "ProfitGeneralMerch3": {
-            "shape": [],
-            "definition": "Annual profit for general merchandise shop when 3 stores",
-            "type": "integer"
-        },
-        "ProfitBookstore1": {
-            "shape": [],
-            "definition": "Annual profit for bookstore when 1 store",
-            "type": "integer"
-        },
-        "ProfitBookstore2": {
-            "shape": [],
-            "definition": "Annual profit for bookstore when 2 stores",
-            "type": "integer"
-        },
-        "ProfitCatering1": {
-            "shape": [],
-            "definition": "Annual profit for catering shop when 1 store",
-            "type": "integer"
-        },
-        "ProfitCatering2": {
-            "shape": [],
-            "definition": "Annual profit for catering shop when 2 stores",
-            "type": "integer"
-        },
-        "ProfitCatering3": {
-            "shape": [],
-            "definition": "Annual profit for catering shop when 3 stores",
+            "definition": "Number of workers to be assigned as Zone Pickers or Restock Specialists",
             "type": "integer"
         }
     },
     "objective": {
-        "description": "\"The goal is to maximize the total rental income from leasing stores to tenants\"",
+        "description": "Maximize total package output during the 8-hour flash sale shift",
         "formulation": null,
         "code": null
     },
     "constraints": [
         {
-            "description": "Total area occupied by all stores should not exceed the total available space of 5000 m\u00b2",
+            "description": "Exactly one worker must be assigned as a Relay Runner",
             "formulation": null,
             "code": null
         },
         {
-            "description": "Number of jewelry shops should be at least the minimum required",
+            "description": "The number of Zone Pickers plus the number of Restock Specialists must equal the number of non-relay workers (9)",
             "formulation": null,
             "code": null
         },
         {
-            "description": "Number of shoes & hats shops should be at least the minimum required",
+            "description": "The team's average travel fatigue must not exceed the maximum allowed average travel fatigue per day",
             "formulation": null,
             "code": null
         },
         {
-            "description": "Number of general merchandise shops should be at least the minimum required",
+            "description": "The number of Zone Pickers must be non-negative",
             "formulation": null,
             "code": null
         },
         {
-            "description": "Number of bookstores should be at least the minimum required",
-            "formulation": null,
-            "code": null
-        },
-        {
-            "description": "Number of catering shops should be at least the minimum required",
-            "formulation": null,
-            "code": null
-        },
-        {
-            "description": "Number of jewelry shops should not exceed the maximum allowed",
-            "formulation": null,
-            "code": null
-        },
-        {
-            "description": "Number of shoes & hats shops should not exceed the maximum allowed",
-            "formulation": null,
-            "code": null
-        },
-        {
-            "description": "Number of general merchandise shops should not exceed the maximum allowed",
-            "formulation": null,
-            "code": null
-        },
-        {
-            "description": "Number of bookstores should not exceed the maximum allowed",
-            "formulation": null,
-            "code": null
-        },
-        {
-            "description": "Number of catering shops should not exceed the maximum allowed",
+            "description": "The number of Restock Specialists must be non-negative",
             "formulation": null,
             "code": null
         }

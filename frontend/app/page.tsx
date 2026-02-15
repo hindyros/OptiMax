@@ -16,11 +16,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-pattern particle-bg relative overflow-hidden">
-      {/* Animated floating orbs in background */}
-      <div className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-float" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-      <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-success/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }} />
+    <div className="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden bg-app-gradient">
 
       {/* Hero Section */}
       <motion.div
@@ -37,7 +33,7 @@ export default function LandingPage() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="inline-block"
           >
-            <h1 className="text-8xl font-bold neon-glow animate-gradient">
+            <h1 className="text-8xl font-bold">
               <span className="text-foreground">Opti</span>
               <span className="text-primary italic">MATE</span>
             </h1>
@@ -65,7 +61,7 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.6 }}
-          className="glass-card p-8 rounded-2xl max-w-3xl mx-auto"
+          className="glass-card p-12 rounded-2xl max-w-5xl mx-auto"
         >
           <p className="text-lg text-foreground leading-relaxed">
             Transform natural language into optimal solutions. Describe your problem, and watch as our AI
@@ -139,8 +135,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5, delay: 1.3 + index * 0.1 }}
-                whileHover={{ scale: 1.05, y: -2 }}
-                className="card-hover px-5 py-3 glass-card rounded-xl text-foreground text-sm font-medium flex items-center gap-2 cursor-default"
+                className="px-5 py-3 glass-card rounded-xl text-foreground text-sm font-medium flex items-center gap-2 cursor-default"
               >
                 <span className="text-xl">{useCase.icon}</span>
                 {useCase.text}
@@ -187,26 +182,15 @@ function FeatureCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay }}
-      whileHover={{ y: -10, scale: 1.03 }}
-      className="glass-card gradient-border rounded-2xl p-8 card-hover group relative overflow-hidden"
+      className="glass-card gradient-border rounded-2xl p-8 group relative overflow-hidden hover:border-primary/30 transition-all"
     >
-      {/* Animated glow on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
       <div className="relative z-10">
-        <motion.div
-          className="text-5xl mb-5"
-          animate={{ rotate: [0, 10, -10, 0] }}
-          transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-        >
+        <div className="text-5xl mb-5">
           {icon}
-        </motion.div>
-        <h3 className="text-xl font-bold text-foreground mb-3 gradient-text">{title}</h3>
+        </div>
+        <h3 className="text-xl font-bold mb-3" style={{ color: '#e76a28' }}>{title}</h3>
         <p className="text-sm text-foreground-dim leading-relaxed">{description}</p>
       </div>
-
-      {/* Corner accent */}
-      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/20 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
     </motion.div>
   );
 }

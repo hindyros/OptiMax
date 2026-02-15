@@ -44,10 +44,11 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(data);
-  } catch (error: any) {
-    console.error('[HeyGen] Status check failed:', error.message);
+  } catch (error) {
+    console.error('[HeyGen] Status check failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to check status', details: error.message },
+      { error: 'Failed to check status', details: errorMessage },
       { status: 500 }
     );
   }

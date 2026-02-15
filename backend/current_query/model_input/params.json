@@ -1,182 +1,68 @@
 {
-    "TotalSpace": {
+    "TeamSize": {
         "shape": [],
-        "definition": "Total available space for lease in the mall",
+        "definition": "Total number of workers in the team",
         "type": "integer",
-        "value": 5000
+        "value": 10
     },
-    "RentPercentage": {
+    "ShiftDuration": {
         "shape": [],
-        "definition": "Percentage of annual profit paid as rent",
-        "type": "float",
-        "value": 0.2
-    },
-    "AreaJewelry": {
-        "shape": [],
-        "definition": "Area occupied by one jewelry shop",
-        "type": "integer",
-        "value": 250
-    },
-    "AreaShoesHats": {
-        "shape": [],
-        "definition": "Area occupied by one shoes & hats shop",
-        "type": "integer",
-        "value": 350
-    },
-    "AreaGeneralMerch": {
-        "shape": [],
-        "definition": "Area occupied by one general merchandise shop",
-        "type": "integer",
-        "value": 800
-    },
-    "AreaBookstore": {
-        "shape": [],
-        "definition": "Area occupied by one bookstore",
-        "type": "integer",
-        "value": 400
-    },
-    "AreaCatering": {
-        "shape": [],
-        "definition": "Area occupied by one catering shop",
-        "type": "integer",
-        "value": 500
-    },
-    "MinJewelry": {
-        "shape": [],
-        "definition": "Minimum number of jewelry shops",
-        "type": "integer",
-        "value": 1
-    },
-    "MinShoesHats": {
-        "shape": [],
-        "definition": "Minimum number of shoes & hats shops",
-        "type": "integer",
-        "value": 1
-    },
-    "MinGeneralMerch": {
-        "shape": [],
-        "definition": "Minimum number of general merchandise shops",
-        "type": "integer",
-        "value": 1
-    },
-    "MinBookstore": {
-        "shape": [],
-        "definition": "Minimum number of bookstores",
-        "type": "integer",
-        "value": 0
-    },
-    "MinCatering": {
-        "shape": [],
-        "definition": "Minimum number of catering shops",
-        "type": "integer",
-        "value": 1
-    },
-    "MaxJewelry": {
-        "shape": [],
-        "definition": "Maximum number of jewelry shops",
-        "type": "integer",
-        "value": 3
-    },
-    "MaxShoesHats": {
-        "shape": [],
-        "definition": "Maximum number of shoes & hats shops",
-        "type": "integer",
-        "value": 2
-    },
-    "MaxGeneralMerch": {
-        "shape": [],
-        "definition": "Maximum number of general merchandise shops",
-        "type": "integer",
-        "value": 3
-    },
-    "MaxBookstore": {
-        "shape": [],
-        "definition": "Maximum number of bookstores",
-        "type": "integer",
-        "value": 2
-    },
-    "MaxCatering": {
-        "shape": [],
-        "definition": "Maximum number of catering shops",
-        "type": "integer",
-        "value": 3
-    },
-    "ProfitJewelry1": {
-        "shape": [],
-        "definition": "Annual profit for jewelry shop when 1 store",
-        "type": "integer",
-        "value": 9
-    },
-    "ProfitJewelry2": {
-        "shape": [],
-        "definition": "Annual profit for jewelry shop when 2 stores",
+        "definition": "Duration of the flash sale shift in hours",
         "type": "integer",
         "value": 8
     },
-    "ProfitJewelry3": {
+    "MaxAverageTravelFatigue": {
         "shape": [],
-        "definition": "Annual profit for jewelry shop when 3 stores",
-        "type": "integer",
-        "value": 7
-    },
-    "ProfitShoesHats1": {
-        "shape": [],
-        "definition": "Annual profit for shoes & hats shop when 1 store",
+        "definition": "Maximum allowed average travel fatigue in miles per day",
         "type": "integer",
         "value": 10
     },
-    "ProfitShoesHats2": {
+    "RelayRunnerCount": {
         "shape": [],
-        "definition": "Annual profit for shoes & hats shop when 2 stores",
+        "definition": "Mandatory number of Relay Runners",
+        "type": "integer",
+        "value": 1
+    },
+    "RelayRunnerSpeed": {
+        "shape": [],
+        "definition": "Speed of Relay Runner in miles per hour",
+        "type": "float",
+        "value": 4
+    },
+    "RelayRunnerPackageRate": {
+        "shape": [],
+        "definition": "Package processing rate for Relay Runner in packages per hour",
+        "type": "integer",
+        "value": 0
+    },
+    "ZonePickerSpeed": {
+        "shape": [],
+        "definition": "Speed of Zone Picker in miles per hour",
+        "type": "float",
+        "value": 2.5
+    },
+    "ZonePickerPackageRate": {
+        "shape": [],
+        "definition": "Package processing rate for Zone Picker in packages per hour",
+        "type": "integer",
+        "value": 60
+    },
+    "RestockSpecialistSpeed": {
+        "shape": [],
+        "definition": "Speed of Restock Specialist in miles per hour",
+        "type": "float",
+        "value": 1.5
+    },
+    "RestockSpecialistPackageRate": {
+        "shape": [],
+        "definition": "Package processing rate for Restock Specialist in packages per hour",
+        "type": "integer",
+        "value": 30
+    },
+    "NonRelayWorkers": {
+        "shape": [],
+        "definition": "Number of workers to be assigned as Zone Pickers or Restock Specialists",
         "type": "integer",
         "value": 9
-    },
-    "ProfitGeneralMerch1": {
-        "shape": [],
-        "definition": "Annual profit for general merchandise shop when 1 store",
-        "type": "integer",
-        "value": 27
-    },
-    "ProfitGeneralMerch2": {
-        "shape": [],
-        "definition": "Annual profit for general merchandise shop when 2 stores",
-        "type": "integer",
-        "value": 21
-    },
-    "ProfitGeneralMerch3": {
-        "shape": [],
-        "definition": "Annual profit for general merchandise shop when 3 stores",
-        "type": "integer",
-        "value": 20
-    },
-    "ProfitBookstore1": {
-        "shape": [],
-        "definition": "Annual profit for bookstore when 1 store",
-        "type": "integer",
-        "value": 16
-    },
-    "ProfitBookstore2": {
-        "shape": [],
-        "definition": "Annual profit for bookstore when 2 stores",
-        "type": "integer",
-        "value": 10
-    },
-    "ProfitCatering1": {
-        "shape": [],
-        "definition": "Annual profit for catering shop when 1 store",
-        "type": "integer",
-        "value": 17
-    },
-    "ProfitCatering2": {
-        "shape": [],
-        "definition": "Annual profit for catering shop when 2 stores",
-        "type": "integer",
-        "value": 15
-    },
-    "ProfitCatering3": {
-        "shape": [],
-        "definition": "Annual profit for catering shop when 3 stores",
-        "type": "integer",
-        "value": 12
     }
 }

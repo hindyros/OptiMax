@@ -6,14 +6,14 @@
 const BASE = ''; // same origin
 
 /**
- * 1. Start video generation. Pass the full report markdown.
+ * 1. Start video generation. Pass the script text (cleaned summary).
  * Returns the HeyGen video_id to poll for status.
  */
-export async function startHeyGenVideo(reportContent: string): Promise<string> {
+export async function startHeyGenVideo(scriptContent: string): Promise<string> {
   const res = await fetch(`${BASE}/api/heygen/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ report_content: reportContent }),
+    body: JSON.stringify({ report_content: scriptContent }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error || 'Failed to start video');
@@ -66,13 +66,14 @@ export async function waitForHeyGenVideo(
 
 /**
  * Full flow: start generation, poll until done, return video URL.
+ * Pass the cleaned script content (e.g., LLM-generated summary).
  */
 export async function generateHeyGenVideo(
-  reportContent: string,
+  scriptContent: string,
   onProgress?: (message: string) => void
 ): Promise<string> {
   onProgress?.('Starting...');
-  const videoId = await startHeyGenVideo(reportContent);
+  const videoId = await startHeyGenVideo(scriptContent);
   onProgress?.('Rendering started.');
   return waitForHeyGenVideo(videoId, onProgress);
 }

@@ -12,11 +12,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { script } = body;
+    // Accept either 'script' or 'report_content' for flexibility
+    const script = body.script || body.report_content;
 
     if (!script) {
       return NextResponse.json(
-        { error: 'script is required' },
+        { error: 'script or report_content is required' },
         { status: 400 }
       );
     }
@@ -74,10 +75,11 @@ export async function POST(request: NextRequest) {
     console.log('[HeyGen] ✓ Video generation started:', data.data?.video_id || data.video_id);
 
     return NextResponse.json(data);
-  } catch (error: any) {
-    console.error('[HeyGen] Generation failed:', error.message);
+  } catch (error) {
+    console.error('[HeyGen] Generation failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to generate video', details: error.message },
+      { error: 'Failed to generate video', details: errorMessage },
       { status: 500 }
     );
   }

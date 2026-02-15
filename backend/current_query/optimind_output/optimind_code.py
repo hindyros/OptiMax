@@ -2,70 +2,37 @@ import gurobipy as gp
 from gurobipy import GRB
 
 # Data
-area = {
-    'J': 250,
-    'S': 350,
-    'G': 800,
-    'C': 500,
-    'B': 400
-}
-profit = {
-    'J': {1: 9, 2: 16, 3: 21},
-    'S': {1: 10, 2: 18},
-    'G': {1: 27, 2: 42, 3: 60},
-    'C': {1: 17, 2: 30, 3: 36},
-    'B': {0: 0, 1: 16, 2: 20}
-}
-# Allowed numbers of stores for each type
-allowed = {
-    'J': [1, 2, 3],
-    'S': [1, 2],
-    'G': [1, 2, 3],
-    'C': [1, 2, 3],
-    'B': [0, 1, 2]
-}
-rent_perc = 0.2
-total_area = 5000
+TeamSize = 10
+ShiftDuration = 8
+RelayRunnerCount = 1
+ZonePickerPackageRate = 60
+RestockSpecialistPackageRate = 30
+NonRelayWorkers = 9
 
 # Create model
-m = gp.Model('MallLease')
+m = gp.Model("FlashSaleTeam")
 
-# Decision variables: y[t,k] binary
-y = {}
-for t in allowed:
-    for k in allowed[t]:
-        y[t, k] = m.addVar(vtype=GRB.BINARY, name=f'y_{t}_{k}')
+# Decision variable: number of Zone Pickers among the 9 non‑relay workers
+Z = m.addVar(vtype=GRB.INTEGER, name="ZonePickers", lb=0, ub=NonRelayWorkers)
 
-# Exactly one bundle per type
-for t in allowed:
-    m.addConstr(gp.quicksum(y[t, k] for k in allowed[t]) == 1,
-                name=f'one_bundle_{t}')
+# Objective: maximize total packages
+m.setObjective(60 * Z + 30 * (NonRelayWorkers - Z), GRB.MAXIMIZE)
 
-# Area constraint
-area_expr = gp.quicksum(area[t] * gp.quicksum(k * y[t, k] for k in allowed[t])
-                      for t in allowed)
-m.addConstr(area_expr <= total_area, name='area_limit')
-
-# Objective: maximize rental income
-obj = gp.quicksum(profit[t][k] * y[t, k]
-                   for t in allowed for k in allowed[t])
-m.setObjective(rent_perc * obj, GRB.MAXIMIZE)
+# No additional constraints are needed (the fatigue constraint is automatically satisfied)
 
 # Optimize
 m.optimize()
 
 # Print results
 if m.status == GRB.OPTIMAL:
-    print("\nOptimal solution:")
-    for t in allowed:
-        for k in allowed[t]:
-            if y[t, k].X > 0.5:
-                print(f"{t}: {k} stores")
-    total_profit = sum(profit[t][k] * y[t, k].X
-                       for t in allowed for k in allowed[t])
-    total_rent = rent_perc * total_profit
-    print(f"\nTotal profit (before rent): {total_profit}")
-    print(f"Total rental income: {total_rent:.2f}")
+    zone = int(Z.X)
+    restock = NonRelayWorkers - zone
+    total_packages = zone * ZonePickerPackageRate + restock * RestockSpecialistPackageRate
+    print(f"Optimal strategy:")
+    print(f"  Relay Runners: {RelayRunnerCount}")
+    print(f"  Zone Pickers: {zone}")
+    print(f"  Restock Specialists: {restock}")
+    print(f"  Total packages produced: {total_packages}")
 else:
     print("No optimal solution found.")
 

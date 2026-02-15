@@ -64,7 +64,7 @@ export default function RefinePage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden bg-app-gradient">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -72,14 +72,6 @@ export default function RefinePage() {
       >
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12 px-4">
-          <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-4xl sm:text-5xl md:text-6xl mb-4 sm:mb-6"
-          >
-            ✨
-          </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -94,7 +86,7 @@ export default function RefinePage() {
             transition={{ delay: 0.3 }}
             className="text-base sm:text-lg md:text-xl text-foreground-dim max-w-2xl mx-auto"
           >
-            Enter your optimization challenge below and let <span className="text-foreground">Opti</span><span className="text-primary italic font-bold">MATE</span> find the optimal solution
+            Enter your optimization challenge below and let Opti<span className="text-primary italic font-bold">MATE</span> find the optimal solution
           </motion.p>
         </div>
 
@@ -148,23 +140,66 @@ export default function RefinePage() {
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2 sm:gap-3">
-                  🚀 Optimize Now
+                  Optimize Now
                 </span>
               )}
             </button>
 
-            {/* Example Problems Link */}
-            <div className="text-center pt-2 sm:pt-4">
-              <button
-                onClick={() => {
-                  setProblemDescription(
-                    "I need to optimize hospital bed allocation across 7 departments to maximize patient care while minimizing daily operational costs. We have different capacities, staffing levels, and patient demands for each department. Priority departments include Emergency, ICU, and Surgery."
-                  );
-                }}
-                className="text-xs sm:text-sm text-primary hover:text-accent underline transition-colors"
-              >
-                Load Example Problem
-              </button>
+            {/* Example Problems Cards */}
+            <div className="pt-4">
+              <p className="text-xs sm:text-sm text-foreground-dim mb-3 text-center">Or try an example problem:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  onClick={() => {
+                    setProblemDescription(
+                      "The number of nurses required in each time period over 24 hours at a certain hospital is as follows: 2:00-6:00 - 10 people, 6:00-10:00 - 15 people, 10:00-14:00 - 25 people, 14:00-18:00 - 20 people, 18:00-22:00 - 18 people, 22:00-2:00 - 12 people. Nurses start shifts in 6 batches at 2:00, 6:00, 10:00, 14:00, 18:00, and 22:00 and work continuously for 8 hours. Please determine: If the hospital can hire contract nurses with the same working hours as regular nurses, and if the pay for regular nurses is 10 yuan/hour and for contract nurses is 15 yuan/hour, should the hospital hire contract nurses and if so, how many?"
+                    );
+                  }}
+                  className="glass-card border border-border rounded-lg p-3 hover:border-primary/50 transition-all text-left group"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">🏥</span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">Healthcare</h3>
+                      <p className="text-xs text-foreground-dim">Nurse shift scheduling optimization</p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setProblemDescription(
+                      "We have a 10-person team for an 8-hour flash sale shift where we must maximize total package output while keeping the team's average travel fatigue under 10 miles per day. One worker must be the mandatory Relay Runner (4.0 mph, 0 packages/hr), and the remaining 9 must be split between Zone Pickers (2.5 mph, 60 packages/hr) and Restock Specialists (1.5 mph, 30 packages/hr). Find me the optimal strategy to get the maximum output package output."
+                    );
+                  }}
+                  className="glass-card border border-border rounded-lg p-3 hover:border-primary/50 transition-all text-left group"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">📦</span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">E-Commerce</h3>
+                      <p className="text-xs text-foreground-dim">Warehouse team allocation</p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setProblemDescription(
+                      "Changjiang Comprehensive Shopping Mall has 5000 m² of space for lease and plans to attract the following 5 types of stores as tenants. The table below shows the area occupied by each type of store for one shop, the minimum and maximum number of shops for each type within the mall, and the expected annual profit (in ten thousand yuan) per store for different numbers of stores. Each store pays 20% of its annual profit as rent to the mall. Question: How many of each type of store should the mall lease to maximize total rental income? Table: | Code | Store Type | Area per Shop / m² | Min | Max | 1 Store | 2 Stores | 3 Stores | |------|------------|--------------------|-----|-----|---------|----------|----------| | 1 | Jewelry | 250 | 1 | 3 | 9 | 8 | 7 | | 2 | Shoes & Hats | 350 | 1 | 2 | 10 | 9 | - | | 3 | General Merchandise | 800 | 1 | 3 | 27 | 21 | 20 | | 4 | Bookstore | 400 | 0 | 2 | 16 | 10 | - | | 5 | Catering | 500 | 1 | 3 | 17 | 15 | 12 |"
+                    );
+                  }}
+                  className="glass-card border border-border rounded-lg p-3 hover:border-primary/50 transition-all text-left group"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">🏬</span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">Real Estate</h3>
+                      <p className="text-xs text-foreground-dim">Shopping mall space allocation</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

@@ -15,121 +15,55 @@ with open("data.json", "r") as f:
 
 ### Define the parameters
 
-TotalSpace = data["TotalSpace"] # shape: [], definition: Total available space for lease in the mall
+TeamSize = data["TeamSize"] # shape: [], definition: Total number of workers in the team
 
-RentPercentage = data["RentPercentage"] # shape: [], definition: Percentage of annual profit paid as rent
+ShiftDuration = data["ShiftDuration"] # shape: [], definition: Duration of the flash sale shift in hours
 
-AreaJewelry = data["AreaJewelry"] # shape: [], definition: Area occupied by one jewelry shop
+MaxAverageTravelFatigue = data["MaxAverageTravelFatigue"] # shape: [], definition: Maximum allowed average travel fatigue in miles per day
 
-AreaShoesHats = data["AreaShoesHats"] # shape: [], definition: Area occupied by one shoes & hats shop
+RelayRunnerCount = data["RelayRunnerCount"] # shape: [], definition: Mandatory number of Relay Runners
 
-AreaGeneralMerch = data["AreaGeneralMerch"] # shape: [], definition: Area occupied by one general merchandise shop
+RelayRunnerSpeed = data["RelayRunnerSpeed"] # shape: [], definition: Speed of Relay Runner in miles per hour
 
-AreaBookstore = data["AreaBookstore"] # shape: [], definition: Area occupied by one bookstore
+RelayRunnerPackageRate = data["RelayRunnerPackageRate"] # shape: [], definition: Package processing rate for Relay Runner in packages per hour
 
-AreaCatering = data["AreaCatering"] # shape: [], definition: Area occupied by one catering shop
+ZonePickerSpeed = data["ZonePickerSpeed"] # shape: [], definition: Speed of Zone Picker in miles per hour
 
-MinJewelry = data["MinJewelry"] # shape: [], definition: Minimum number of jewelry shops
+ZonePickerPackageRate = data["ZonePickerPackageRate"] # shape: [], definition: Package processing rate for Zone Picker in packages per hour
 
-MinShoesHats = data["MinShoesHats"] # shape: [], definition: Minimum number of shoes & hats shops
+RestockSpecialistSpeed = data["RestockSpecialistSpeed"] # shape: [], definition: Speed of Restock Specialist in miles per hour
 
-MinGeneralMerch = data["MinGeneralMerch"] # shape: [], definition: Minimum number of general merchandise shops
+RestockSpecialistPackageRate = data["RestockSpecialistPackageRate"] # shape: [], definition: Package processing rate for Restock Specialist in packages per hour
 
-MinBookstore = data["MinBookstore"] # shape: [], definition: Minimum number of bookstores
-
-MinCatering = data["MinCatering"] # shape: [], definition: Minimum number of catering shops
-
-MaxJewelry = data["MaxJewelry"] # shape: [], definition: Maximum number of jewelry shops
-
-MaxShoesHats = data["MaxShoesHats"] # shape: [], definition: Maximum number of shoes & hats shops
-
-MaxGeneralMerch = data["MaxGeneralMerch"] # shape: [], definition: Maximum number of general merchandise shops
-
-MaxBookstore = data["MaxBookstore"] # shape: [], definition: Maximum number of bookstores
-
-MaxCatering = data["MaxCatering"] # shape: [], definition: Maximum number of catering shops
-
-ProfitJewelry1 = data["ProfitJewelry1"] # shape: [], definition: Annual profit for jewelry shop when 1 store
-
-ProfitJewelry2 = data["ProfitJewelry2"] # shape: [], definition: Annual profit for jewelry shop when 2 stores
-
-ProfitJewelry3 = data["ProfitJewelry3"] # shape: [], definition: Annual profit for jewelry shop when 3 stores
-
-ProfitShoesHats1 = data["ProfitShoesHats1"] # shape: [], definition: Annual profit for shoes & hats shop when 1 store
-
-ProfitShoesHats2 = data["ProfitShoesHats2"] # shape: [], definition: Annual profit for shoes & hats shop when 2 stores
-
-ProfitGeneralMerch1 = data["ProfitGeneralMerch1"] # shape: [], definition: Annual profit for general merchandise shop when 1 store
-
-ProfitGeneralMerch2 = data["ProfitGeneralMerch2"] # shape: [], definition: Annual profit for general merchandise shop when 2 stores
-
-ProfitGeneralMerch3 = data["ProfitGeneralMerch3"] # shape: [], definition: Annual profit for general merchandise shop when 3 stores
-
-ProfitBookstore1 = data["ProfitBookstore1"] # shape: [], definition: Annual profit for bookstore when 1 store
-
-ProfitBookstore2 = data["ProfitBookstore2"] # shape: [], definition: Annual profit for bookstore when 2 stores
-
-ProfitCatering1 = data["ProfitCatering1"] # shape: [], definition: Annual profit for catering shop when 1 store
-
-ProfitCatering2 = data["ProfitCatering2"] # shape: [], definition: Annual profit for catering shop when 2 stores
-
-ProfitCatering3 = data["ProfitCatering3"] # shape: [], definition: Annual profit for catering shop when 3 stores
+NonRelayWorkers = data["NonRelayWorkers"] # shape: [], definition: Number of workers to be assigned as Zone Pickers or Restock Specialists
 
 
 
 ### Define the variables
 
-NumJewelry = model.addVar(vtype=GRB.INTEGER, name="NumJewelry")
+NumZonePickers = model.addVar(vtype=GRB.INTEGER, name="NumZonePickers")
 
-NumShoesHats = model.addVar(vtype=GRB.INTEGER, name="NumShoesHats")
-
-NumGeneralMerch = model.addVar(vtype=GRB.INTEGER, name="NumGeneralMerch")
-
-NumBookstore = model.addVar(vtype=GRB.INTEGER, name="NumBookstore")
-
-NumCatering = model.addVar(vtype=GRB.INTEGER, name="NumCatering")
+NumRestockSpecialists = model.addVar(vtype=GRB.INTEGER, name="NumRestockSpecialists")
 
 
 
 ### Define the constraints
 
-model.addConstr(NumJewelry * AreaJewelry + NumShoesHats * AreaShoesHats + NumGeneralMerch * AreaGeneralMerch + NumBookstore * AreaBookstore + NumCatering * AreaCatering <= TotalSpace)
-model.addConstr(NumJewelry >= MinJewelry)
-model.addConstr(NumShoesHats >= MinShoesHats)
-model.addConstr(NumGeneralMerch >= MinGeneralMerch)
-model.addConstr(NumBookstore >= MinBookstore)
-model.addConstr(NumCatering >= MinCatering)
-model.addConstr(NumJewelry <= MaxJewelry)
-model.addConstr(NumShoesHats <= MaxShoesHats)
-model.addConstr(NumGeneralMerch <= MaxGeneralMerch)
-model.addConstr(NumBookstore <= MaxBookstore)
-model.addConstr(NumCatering <= MaxCatering)
+model.addConstr(RelayRunners == RelayRunnerCount)
+model.addConstr(RelayRunnerCount + NumZonePickers + NumRestockSpecialists == TeamSize)
+model.addConstr(NumZonePickers + NumRestockSpecialists == NonRelayWorkers)
+model.addConstr(NumZonePickers + NumRestockSpecialists == NonRelayWorkers)
+model.addConstr(RelayRunnerCount * RelayRunnerSpeed * ShiftDuration + 
+                NumZonePickers * ZonePickerSpeed * ShiftDuration + 
+                NumRestockSpecialists * RestockSpecialistSpeed * ShiftDuration <= 
+                MaxAverageTravelFatigue * TeamSize)
+model.addConstr(NumZonePickers >= 0)
+model.addConstr(NumRestockSpecialists >= 0)
 
 
 ### Define the objective
 
-model.setObjective(
-    RentPercentage * (
-        (NumJewelry * ProfitJewelry1) * (NumJewelry == 1) +
-        (NumJewelry * ProfitJewelry2) * (NumJewelry == 2) +
-        (NumJewelry * ProfitJewelry3) * (NumJewelry == 3) +
-        
-        (NumShoesHats * ProfitShoesHats1) * (NumShoesHats == 1) +
-        (NumShoesHats * ProfitShoesHats2) * (NumShoesHats == 2) +
-        
-        (NumGeneralMerch * ProfitGeneralMerch1) * (NumGeneralMerch == 1) +
-        (NumGeneralMerch * ProfitGeneralMerch2) * (NumGeneralMerch == 2) +
-        (NumGeneralMerch * ProfitGeneralMerch3) * (NumGeneralMerch == 3) +
-        
-        (NumBookstore * ProfitBookstore1) * (NumBookstore == 1) +
-        (NumBookstore * ProfitBookstore2) * (NumBookstore == 2) +
-        
-        (NumCatering * ProfitCatering1) * (NumCatering == 1) +
-        (NumCatering * ProfitCatering2) * (NumCatering == 2) +
-        (NumCatering * ProfitCatering3) * (NumCatering == 3)
-    ), 
-    GRB.MAXIMIZE
-)
+model.setObjective((RelayRunnerCount * RelayRunnerPackageRate + NumZonePickers * ZonePickerPackageRate + NumRestockSpecialists * RestockSpecialistPackageRate) * ShiftDuration, GRB.MAXIMIZE)
 
 
 ### Optimize the model

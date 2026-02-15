@@ -81,6 +81,29 @@ export default function OptimizePage() {
   const [error, setError] = useState<string | null>(null);
 
   /**
+   * Navigation protection - warn user when leaving during optimization
+   */
+  useEffect(() => {
+    // Only protect if optimization is in progress
+    if (!status || status.status === 'completed' || status.status === 'failed') {
+      return;
+    }
+
+    // Browser navigation warning
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Optimization is still running. Leaving this page will not stop the process.';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [status]);
+
+  /**
    * Poll job status
    */
   useEffect(() => {
@@ -131,11 +154,7 @@ export default function OptimizePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
-        {/* Floating orbs */}
-        <div className="absolute top-20 left-10 w-64 h-64 bg-error/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-error/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden bg-app-gradient">
         <div className="max-w-md md:max-w-lg w-full glass-card gradient-border rounded-2xl p-6 sm:p-8 text-center relative z-10">
           <div className="text-5xl mb-4">❌</div>
           <h2 className="text-2xl font-bold text-error mb-4">Optimization Failed</h2>
@@ -163,7 +182,7 @@ export default function OptimizePage() {
 
   if (!status) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-surface/30 particle-bg">
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-app-gradient">
         <div className="text-center">
           <div className="text-4xl mb-4 animate-pulse">⏳</div>
           <p className="text-foreground-dim">Loading...</p>
@@ -173,11 +192,7 @@ export default function OptimizePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
-      {/* Animated floating orbs */}
-      <div className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-float" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-      <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-success/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }} />
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden bg-app-gradient">
 
       <div className="max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full relative z-10">
          {/* Header */}
@@ -186,21 +201,18 @@ export default function OptimizePage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8 sm:mb-10 md:mb-12"
         >
-          <motion.div
-            className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 inline-block"
-            animate={{ rotate: [0, 360] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-          >
-            ⚙️
-          </motion.div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 flex items-center justify-center gap-2">
             <span className="text-foreground">Opti</span>
             <span className="text-primary italic">MATE</span>
-            <span className="text-foreground"> is Working...</span>
+            <span className="text-foreground"> is Working</span>
+            <motion.span
+              animate={{ rotate: [0, 360] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              className="text-2xl sm:text-3xl md:text-4xl"
+            >
+              ⚙️
+            </motion.span>
           </h1>
-          {/* <p className="text-foreground-dim">
-            We're solving your optimization problem. This may take up to 10 minutes depending on complexity.
-          </p> */}
           <p className="text-xs sm:text-sm text-foreground-dim mt-2">
             Expected processing time: ≤10 mins
           </p>

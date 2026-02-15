@@ -1,9 +1,8 @@
 Traceback (most recent call last):
-  File "/home/mildness/Documents/treehacks/OptiMax/backend/current_query/optimus_output/code_1.py", line 104, in <module>
-    quicksum(i * bookstore_profits[i] * bookstore_vars[i] for i in range(MinBookstore, MaxBookstore + 1)) +
-    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "src/gurobipy/_helpers.pyx", line 41, in gurobipy._helpers.quicksum
-  File "/home/mildness/Documents/treehacks/OptiMax/backend/current_query/optimus_output/code_1.py", line 104, in <genexpr>
-    quicksum(i * bookstore_profits[i] * bookstore_vars[i] for i in range(MinBookstore, MaxBookstore + 1)) +
-                 ~~~~~~~~~~~~~~~~~^^^
-KeyError: 0
+  File "/home/mildness/Documents/treehacks/OptiMax/backend/current_query/optimus_output/code_1.py", line 74, in <module>
+    print("Optimal Objective Value: ", model.objVal)
+                                       ^^^^^^^^^^^^
+  File "src/gurobipy/_model.pyx", line 399, in gurobipy._model.Model.__getattr__
+  File "src/gurobipy/_model.pyx", line 2219, in gurobipy._model.Model.getAttr
+  File "src/gurobipy/_attrutil.pyx", line 119, in gurobipy._attrutil._getattr
+AttributeError: Unable to retrieve attribute 'objVal'. Did you mean: 'ObjVal'?
