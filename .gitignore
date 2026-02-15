@@ -20,6 +20,10 @@ venv/
 *.swp
 *.swo
 
+# Upload folder (keep structure, ignore user data)
+data_upload/*
+!data_upload/.gitkeep
+
 # OS
 .DS_Store
 Thumbs.db

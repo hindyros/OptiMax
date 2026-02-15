@@ -1,5 +1,0 @@
-I manage inventory operations across 120 retail stores and 3 warehouses, and we’re struggling with stockouts during promotions while excess inventory builds up on slower-moving items.
-Using our data on sales trends, real-time inventory levels, supplier lead times, and past pricing strategies, how can I decide how much to reorder, where to allocate stock, and when to adjust prices each week?
-Supplier deliveries are unreliable and lead times fluctuate, so I need decisions that account for uncertainty and warehouse capacity limits.
-My goal is to reduce stockouts on high-demand products, minimize holding and markdown costs, and avoid costly emergency shipments.
-How can I build an AI-driven system that makes coordinated forecasting, replenishment, allocation, and pricing decisions to keep the right products available at the right time at the lowest total cost?

@@ -56,7 +56,7 @@ SYSTEM_PROMPT = (
 # actual Gurobi model variable name found in the generated code.
 SOLUTION_TEMPLATE = """
 
-# --- OptiMax: save objective value ---
+# --- Optima: save objective value ---
 if {var}.status == GRB.OPTIMAL:
     with open("output_solution.txt", "w") as _f:
         _f.write(str({var}.objVal))

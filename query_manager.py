@@ -127,10 +127,11 @@ if __name__ == "__main__":
 
     prepare_workspace(query_dir=args.dir, archive=not args.no_archive)
 
-    print(f"\nWorkspace '{args.dir}/' is ready. Place your input files:")
-    print(f"  {args.dir}/model_input/desc.txt    - Problem description")
-    print(f"  {args.dir}/model_input/params.json  - Parameters with values")
+    print(f"\nWorkspace '{args.dir}/' is ready. Place your raw input files:")
+    print(f"  {args.dir}/raw_input/raw_desc.txt    - Problem description (required)")
+    print(f"  {args.dir}/raw_input/raw_params.csv  - Data CSV (optional)")
     print(f"\nThen run:")
-    print(f"  python optimus.py    # OptiMUS solver")
-    print(f"  python optimind.py   # OptiMind solver")
-    print(f"  python judge.py      # Compare both solutions")
+    print(f"  python raw_to_model.py  # Convert raw inputs to model inputs")
+    print(f"  python optimus.py       # OptiMUS solver")
+    print(f"  python optimind.py      # OptiMind solver")
+    print(f"  python judge.py         # Compare both solutions")
