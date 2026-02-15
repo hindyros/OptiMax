@@ -27,6 +27,9 @@ import sys
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# LLM utility shared with OptiMUS (supports Anthropic / OpenAI / Groq)
+from optimus_pipeline.optimus_utils import get_response
+
 load_dotenv()
 
 # ---------------------------------------------------------------------------
@@ -38,6 +41,8 @@ DEFAULT_BASE_URL = os.environ.get(
     "OPTIMIND_SERVER_URL", "http://localhost:30000/v1"
 )
 EXECUTE_TIMEOUT = 120  # seconds
+DEBUG_MAX_RETRIES = 5  # max debug iterations after initial failure
+DEBUG_MODEL = "claude-haiku-4-5-20251001"  # fast LLM for code-fix agent
 
 SYSTEM_PROMPT = (
     "You are an expert in optimization and mixed integer programming. "
@@ -65,6 +70,36 @@ else:
     with open("output_solution.txt", "w") as _f:
         _f.write(str({var}.status))
     print("Model status:", {var}.status)
+"""
+
+# Prompt sent to the debug agent when OptiMind-generated code fails.
+DEBUG_PROMPT = """\
+You are an expert Python debugger specialising in GurobiPy optimization code.
+
+The following GurobiPy code was generated to solve an optimization problem but
+it **failed** when executed.  Your job is to fix **only** the bugs — do not
+change the mathematical model or the approach.  Keep the fix minimal.
+
+## Problem description
+{description}
+
+## Code that failed
+```python
+{code}
+```
+
+## Error / output
+```
+{error}
+```
+
+Return **only** the corrected Python code inside a single fenced code block:
+
+```python
+# corrected code here
+```
+
+Do NOT include any explanation outside the code block.
 """
 
 
@@ -228,6 +263,114 @@ def _execute_code(code_path: str, cwd: str) -> tuple[str, bool]:
         return msg, False
 
 
+def _debug_code(
+    code: str,
+    error: str,
+    description: str,
+    *,
+    model: str = DEBUG_MODEL,
+) -> str | None:
+    """
+    Ask an LLM to fix broken GurobiPy code.
+
+    Returns the corrected code string, or None if no code block was found in
+    the LLM response.
+    """
+    prompt = DEBUG_PROMPT.format(
+        description=description,
+        code=code,
+        error=error,
+    )
+    response = get_response(prompt, model=model)
+    return _extract_code(response)
+
+
+def _execute_and_debug(
+    code: str,
+    description: str,
+    out_dir: str,
+    *,
+    max_retries: int = DEBUG_MAX_RETRIES,
+) -> tuple[str, str, bool]:
+    """
+    Execute *code* and, on failure, enter a debug loop: send the code and
+    error to an LLM for correction, re-execute, and repeat — up to
+    *max_retries* additional attempts.
+
+    Args:
+        code:        Initial Python code to run.
+        description: Plain-text problem description (context for the debug LLM).
+        out_dir:     Directory where code files and artefacts are written.
+        max_retries: Maximum number of LLM-assisted fix attempts (default 5).
+
+    Returns:
+        (final_code, code_output, success)
+    """
+    code_filename = "optimind_code.py"
+    code_path = os.path.join(out_dir, code_filename)
+
+    # Write initial code
+    with open(code_path, "w") as f:
+        f.write(code)
+    print(f"Saved code      -> {code_path}")
+
+    # First execution attempt (iteration 0)
+    print(f"\nExecuting generated code …")
+    code_output, success = _execute_code(code_path, cwd=out_dir)
+
+    if success:
+        print("[OptiMind] Execution succeeded on first attempt.")
+        return code, code_output, True
+
+    print("[OptiMind] Execution failed. Entering debug loop …")
+
+    for attempt in range(1, max_retries + 1):
+        # Save the error from this attempt
+        error_path = os.path.join(out_dir, f"error_{attempt - 1}.txt")
+        with open(error_path, "w") as f:
+            f.write(code_output)
+        print(f"  [{attempt}/{max_retries}] Saved error -> {error_path}")
+
+        # Ask LLM to fix the code
+        print(f"  [{attempt}/{max_retries}] Sending code + error to debug agent ({DEBUG_MODEL}) …")
+        fixed_code = _debug_code(code, code_output, description)
+
+        if fixed_code is None:
+            print(f"  [{attempt}/{max_retries}] Debug agent returned no code block — skipping.")
+            continue
+
+        # Patch (ensure output_solution.txt writer is present)
+        fixed_code = _patch_code(fixed_code)
+        code = fixed_code
+
+        # Save the new code version
+        code_filename = f"optimind_code_{attempt}.py"
+        code_path = os.path.join(out_dir, code_filename)
+        with open(code_path, "w") as f:
+            f.write(code)
+        print(f"  [{attempt}/{max_retries}] Saved fixed code -> {code_path}")
+
+        # Execute the fixed code
+        code_output, success = _execute_code(code_path, cwd=out_dir)
+
+        if success:
+            print(f"  [{attempt}/{max_retries}] Execution succeeded after {attempt} fix(es).")
+            # Also overwrite the canonical file so downstream consumers find it
+            canonical = os.path.join(out_dir, "optimind_code.py")
+            with open(canonical, "w") as f:
+                f.write(code)
+            return code, code_output, True
+
+        print(f"  [{attempt}/{max_retries}] Still failing.")
+
+    # All retries exhausted
+    error_path = os.path.join(out_dir, f"error_{max_retries}.txt")
+    with open(error_path, "w") as f:
+        f.write(code_output)
+    print(f"[OptiMind] Max debug iterations ({max_retries}) exhausted. Code still failing.")
+    return code, code_output, False
+
+
 # ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
@@ -292,19 +435,15 @@ def run_pipeline(
 
     code = _patch_code(code)
 
-    code_path = os.path.join(out_dir, "optimind_code.py")
-    with open(code_path, "w") as f:
-        f.write(code)
-    print(f"Saved code      -> {code_path}")
+    # ---- 4. Execute (with automatic debug loop on failure) ----
+    # Read the problem description to give the debug agent context
+    desc_path = os.path.join(problem_dir, "model_input", "desc.txt")
+    with open(desc_path) as f:
+        description = f.read().strip()
 
-    # ---- 4. Execute ----
-    print(f"\nExecuting generated code...")
-    code_output, success = _execute_code(code_path, cwd=out_dir)
-
-    if success:
-        print("[OptiMind] Execution succeeded.")
-    else:
-        print("[OptiMind] Execution failed. See code_output.txt for details.")
+    code, code_output, success = _execute_and_debug(
+        code, description, out_dir, max_retries=DEBUG_MAX_RETRIES,
+    )
 
     # ---- 5. Read objective value (written by the executed code) ----
     obj_path = os.path.join(out_dir, "output_solution.txt")
