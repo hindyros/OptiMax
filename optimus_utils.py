@@ -3,10 +3,7 @@ import json
 import time
 from dotenv import load_dotenv
 
-# Load .env first, then api_keys.env, then .venv/.env.hindy (all gitignored)
 load_dotenv()
-load_dotenv("api_keys.env")
-load_dotenv(".venv/.env.hindy")
 
 # Optional providers: only load and create clients when API keys are set
 groq_key = os.environ.get("GROQ_API_KEY", "###")

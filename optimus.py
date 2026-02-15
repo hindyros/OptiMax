@@ -28,7 +28,7 @@ from optimus_utils import load_state, save_state, Logger, create_state, get_labe
 from optimus_rag.rag_utils import RAGMode
 from query_manager import prepare_workspace
 
-OUTPUT_DIR = "output"
+OUTPUT_DIR = "optimus_output"
 DEFAULT_MODEL = "gpt-4o-mini"
 
 
