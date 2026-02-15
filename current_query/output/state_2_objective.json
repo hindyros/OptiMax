@@ -1,0 +1,62 @@
+{
+    "description": "I manage inventory operations across 120 retail stores and 3 warehouses, and we\u2019re struggling with stockouts during promotions while excess inventory builds up on slower-moving items.\nUsing our data on sales trends, real-time inventory levels, supplier lead times, and past pricing strategies, how can I decide how much to reorder, where to allocate stock, and when to adjust prices each week?\nSupplier deliveries are unreliable and lead times fluctuate, so I need decisions that account for uncertainty and warehouse capacity limits.\nMy goal is to reduce stockouts on high-demand products, minimize holding and markdown costs, and avoid costly emergency shipments.\nHow can I build an AI-driven system that makes coordinated forecasting, replenishment, allocation, and pricing decisions to keep the right products available at the right time at the lowest total cost?",
+    "parameters": {
+        "NumberOfProducts": {
+            "shape": [],
+            "definition": "Number of products",
+            "type": "integer"
+        },
+        "NumberOfStores": {
+            "shape": [],
+            "definition": "Number of stores",
+            "type": "integer"
+        },
+        "StockLevels": {
+            "shape": [
+                31
+            ],
+            "definition": "Current stock for each product at each store",
+            "type": "integer"
+        },
+        "SupplierLeadTime": {
+            "shape": [
+                31
+            ],
+            "definition": "Lead time for suppliers in days",
+            "type": "integer"
+        },
+        "StockoutFrequency": {
+            "shape": [
+                31
+            ],
+            "definition": "Frequency of stockouts for each product",
+            "type": "integer"
+        },
+        "ReorderPoint": {
+            "shape": [
+                31
+            ],
+            "definition": "Reorder point for each product",
+            "type": "integer"
+        },
+        "WarehouseCapacity": {
+            "shape": [
+                31
+            ],
+            "definition": "Capacity of each warehouse",
+            "type": "integer"
+        },
+        "OrderFulfillmentTime": {
+            "shape": [
+                31
+            ],
+            "definition": "Order fulfillment time in days",
+            "type": "integer"
+        }
+    },
+    "objective": {
+        "description": "\"The goal is to reduce stockouts on high-demand products, minimize holding and markdown costs, and avoid costly emergency shipments.\"",
+        "formulation": null,
+        "code": null
+    }
+}

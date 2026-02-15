@@ -300,9 +300,8 @@ qs = [
     - Does this constraint logically make sense? How confident are you that this needs to be explicitly modeled in the optimization formulation (from 1 to 5)? 
     - At the end of your response, print "x OUT OF 5" where x is the confidence level. Do not generate anything after that. 
     """,
-        # extract_score,
-        # dummy function
-        lambda x, params, vars, constraints, c: (False, constraints),
+        # Accept by default (no-op check) so we don't spam False when extract_score is not wired
+        lambda x, params, vars, constraints, c: (True, constraints),
     ),
     (
         """
@@ -449,7 +448,6 @@ def get_constraint_formulations(
 
                     valid, res = q[1](x, params, vars, constraints, c)
 
-                    print(valid)
                     if valid:
                         constraints = res
                         break

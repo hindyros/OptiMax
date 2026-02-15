@@ -1,0 +1,145 @@
+{
+    "description": "I manage inventory operations across 120 retail stores and 3 warehouses, and we\u2019re struggling with stockouts during promotions while excess inventory builds up on slower-moving items.\nUsing our data on sales trends, real-time inventory levels, supplier lead times, and past pricing strategies, how can I decide how much to reorder, where to allocate stock, and when to adjust prices each week?\nSupplier deliveries are unreliable and lead times fluctuate, so I need decisions that account for uncertainty and warehouse capacity limits.\nMy goal is to reduce stockouts on high-demand products, minimize holding and markdown costs, and avoid costly emergency shipments.\nHow can I build an AI-driven system that makes coordinated forecasting, replenishment, allocation, and pricing decisions to keep the right products available at the right time at the lowest total cost?",
+    "parameters": {
+        "NumberOfProducts": {
+            "shape": [],
+            "definition": "Number of products",
+            "type": "integer"
+        },
+        "NumberOfStores": {
+            "shape": [],
+            "definition": "Number of stores",
+            "type": "integer"
+        },
+        "StockLevels": {
+            "shape": [
+                31
+            ],
+            "definition": "Current stock for each product at each store",
+            "type": "integer"
+        },
+        "SupplierLeadTime": {
+            "shape": [
+                31
+            ],
+            "definition": "Lead time for suppliers in days",
+            "type": "integer"
+        },
+        "StockoutFrequency": {
+            "shape": [
+                31
+            ],
+            "definition": "Frequency of stockouts for each product",
+            "type": "integer"
+        },
+        "ReorderPoint": {
+            "shape": [
+                31
+            ],
+            "definition": "Reorder point for each product",
+            "type": "integer"
+        },
+        "WarehouseCapacity": {
+            "shape": [
+                31
+            ],
+            "definition": "Capacity of each warehouse",
+            "type": "integer"
+        },
+        "OrderFulfillmentTime": {
+            "shape": [
+                31
+            ],
+            "definition": "Order fulfillment time in days",
+            "type": "integer"
+        }
+    },
+    "objective": {
+        "description": "\"The goal is to reduce stockouts on high-demand products, minimize holding and markdown costs, and avoid costly emergency shipments.\"",
+        "formulation": "$\\min \\sum_{p=1}^{NumberOfProducts} \\left( StockoutFrequency_p + c_p \\cdot \\sum_{s=1}^{NumberOfStores} stockAllocated_{ps} \\right)$"
+    },
+    "constraints": [
+        {
+            "description": "Current stock levels at each store must be non-negative",
+            "formulation": "$\\forall i,j, stockLevel[i,j] \\geq 0$",
+            "code": null
+        },
+        {
+            "description": "Total stock allocated to each product across all stores must not exceed the product's supply capacity at the warehouse",
+            "formulation": "$\\forall p, \\sum_s stockAllocated[p, s] \\leq WarehouseCapacity[p]$",
+            "code": null
+        },
+        {
+            "description": "Stock levels after each reorder must satisfy the reorder point for each product",
+            "formulation": "$\\forall p \\in [1, \\text{NumberOfProducts}], \\forall s \\in [1, \\text{NumberOfStores}], \\text{StockLevels}[p][s] + \\text{stockAllocated}[p][s] \\geq \\text{ReorderPoint}[p]$",
+            "code": null
+        },
+        {
+            "description": "Number of product reorders must be feasible within supplier lead times",
+            "formulation": "$\\forall p, s, \\sum_{t=0}^{\\text{SupplierLeadTime}[p]} \\text{stockAllocated}[p][s] \\leq \\text{StockLevels}[p][s] + \\text{ReorderPoint}[p]$",
+            "code": null
+        },
+        {
+            "description": "Total inventory across all warehouses must not exceed their capacity",
+            "formulation": "$\\sum_{p=1}^{NumberOfProducts} \\sum_{s=1}^{NumberOfStores} stockAllocated[p, s] \\leq \\sum_{w=1}^{3} WarehouseCapacity[w]$",
+            "code": null
+        },
+        {
+            "description": "Frequency of stockouts for each product must be minimized to acceptable levels",
+            "formulation": "$\\forall i, StockoutFrequency[i] \\leq acceptableStockoutFrequency[i]$",
+            "code": null
+        },
+        {
+            "description": "Total holding costs should not exceed a predetermined budget",
+            "formulation": "$\\sum_{i} \\sum_{j} c_i \\cdot stockAllocated[i, j] \\leq B$",
+            "code": null
+        },
+        {
+            "description": "Markdown prices should be set such that they do not result in negative profits",
+            "formulation": "$\\\\forall i, P_i \\\\cdot D_i - c_i \\\\cdot \\\\sum_j stockAllocated[i,j] \\\\geq 0$",
+            "code": null
+        },
+        {
+            "description": "Order fulfillment time must be accounted for in stock allocation decisions",
+            "formulation": "$\\\\forall i, \\\\forall j, \\\\; stockAllocated[i, j] \\\\geq demand[i, j] \\\\times OrderFulfillmentTime[i]$",
+            "code": null
+        }
+    ],
+    "variables": {
+        "stockAllocated": {
+            "shape": [
+                "NumberOfProducts",
+                "NumberOfStores"
+            ],
+            "type": "continuous",
+            "definition": "The total stock allocated for each product at each store"
+        },
+        "acceptableStockoutFrequency": {
+            "shape": [
+                "NumberOfProducts"
+            ],
+            "type": "integer",
+            "definition": "The acceptable frequency of stockouts for each product"
+        },
+        "c": {
+            "shape": [
+                "NumberOfProducts"
+            ],
+            "type": "continuous",
+            "definition": "The holding cost per unit for each product"
+        },
+        "B": {
+            "shape": [],
+            "type": "continuous",
+            "definition": "The predetermined budget for total holding costs"
+        },
+        "demand": {
+            "shape": [
+                "NumberOfProducts",
+                "NumberOfStores"
+            ],
+            "type": "continuous",
+            "definition": "The anticipated demand of each product at each store over the order fulfillment time"
+        }
+    }
+}

@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/hindy/Desktop/OptiMUS/current_query/output/code.py", line 5, in <module>
+    from gurobipy import Model, GRB, quicksum
+ModuleNotFoundError: No module named 'gurobipy'

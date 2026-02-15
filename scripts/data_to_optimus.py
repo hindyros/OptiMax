@@ -131,6 +131,11 @@ def _expert_extract_params_prompt(
         if multi_dataset
         else f'"data_column": either (a) exact column name from the list above, or (b) a derived token: "{DERIVED_N_ROWS}" for total rows, or "{DERIVED_N_DISTINCT_PREFIX}<ColumnName>" for number of distinct values (e.g. "{DERIVED_N_DISTINCT_PREFIX}Product ID").'
     )
+    data_source_line = (
+        '- "data_source": exact dataset name (required when multiple datasets are listed above)'
+        if multi_dataset
+        else ""
+    )
     return f"""You are an optimization expert. A client has described their business problem and provided one or more datasets. Your job is to identify the PARAMETERS (given data) that will feed into the optimization model—the same way you would when a client sends you a brief and several spreadsheets.
 
 Think like a consultant:
@@ -155,7 +160,7 @@ Output a single JSON object with one key "parameters" whose value is an array of
 - "type": "float" or "integer"
 - "shape": "[]" for scalar, "[N]" for vector (N = rows in that dataset), "[N,M]" for matrix
 - {data_spec}
-{"- \"data_source\": exact dataset name (required when multiple datasets are listed above)" if multi_dataset else ""}
+{data_source_line}
 
 Examples:
 - Number of products from first dataset: {{"symbol": "NumberOfProducts", "definition": "Number of products", "type": "integer", "shape": "[]", "data_column": "{DERIVED_N_ROWS}"{', "data_source": "inventory"' if multi_dataset else ''}}}
