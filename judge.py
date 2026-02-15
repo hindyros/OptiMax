@@ -182,7 +182,7 @@ def _format_optimind_for_judge(optimind):
 # LLM calls
 # ---------------------------------------------------------------------------
 
-COMPARISON_PROMPT = """You are an expert judge evaluating two optimization solvers. Your job is to compare their solutions to the same problem and determine which is better.
+COMPARISON_PROMPT = """You are an expert in mathematical optimization and operations research (linear programming, mixed-integer programming, constraint formulation). You routinely review optimization models for correctness, strength of formulation, and implementation fidelity. Your role is to act as a rigorous judge comparing two automated solvers' outputs for the same problem.
 
 ## Original Problem
 
@@ -194,28 +194,35 @@ COMPARISON_PROMPT = """You are an expert judge evaluating two optimization solve
 
 {optimind_summary}
 
-## Your Task
+## Evaluation Criteria (apply in order; later criteria break ties)
 
-Evaluate both solutions on these criteria (in order of importance):
+1. **Solvability & execution**  
+   Did the code run to completion and return a result (optimal, feasible, or a clear status)? A solver that crashes or fails to execute cannot win unless it is the only one with output.
 
-1. **Execution**: Did the code run successfully and produce a result?
-2. **Formulation Quality**: Did the solver correctly identify all constraints, the objective, and variable types from the problem description? Are the mathematical formulations accurate?
-3. **Code Correctness**: Does the generated code correctly implement the stated formulation? Are there bugs (wrong indices, flipped inequalities, missing loops)?
-4. **Objective Value**: Given both formulations are correct, which achieved a better objective value?
+2. **Formulation correctness**  
+   - **Objective**: Does the stated objective (maximize/minimize and expression) match the problem description? Is the direction (max vs min) correct?  
+   - **Constraints**: Are all material constraints from the problem captured? Are inequalities/equalities and right-hand sides consistent with the problem (no flipped signs, no missing or spurious constraints)?  
+   - **Variables**: Are variable types appropriate (continuous vs integer vs binary) and dimensions/shapes consistent with the problem (e.g., correct indexing over products, time periods, resources)?
 
-If only one solver produced output, evaluate that solver's correctness on its own.
+3. **Implementation fidelity**  
+   Does the generated code correctly implement the stated formulation? Check for: wrong indices or loop bounds, transposed or misplaced coefficients, incorrect constraint sense (≤ vs ≥ vs =), and that the solver is invoked and the objective value is reported correctly.
+
+4. **Feasibility & optimality**  
+   If the formulation and code are correct, does the solution satisfy the constraints and yield a valid objective value? If both solvers are correct, which achieves a strictly better objective value given the problem direction (higher for maximize, lower for minimize)?
+
+If only one solver produced output, evaluate that solver on criteria 2–4 only; it wins by default on execution but must still be assessed for formulation and implementation quality.
 
 Respond with a JSON object (and nothing else) in this exact format:
 {{
     "winner": "optimus" or "optimind",
     "direction": "maximize" or "minimize",
-    "reasoning": "2-3 sentence explanation of why this solver was chosen",
-    "optimus_assessment": "1-2 sentence assessment of OptiMUS's solution",
-    "optimind_assessment": "1-2 sentence assessment of OptiMind's solution"
+    "reasoning": "2-4 sentence explanation, using optimization terminology, of why this solver was chosen (cite specific formulation or implementation strengths/weaknesses)",
+    "optimus_assessment": "1-2 sentence assessment of OptiMUS's formulation and execution",
+    "optimind_assessment": "1-2 sentence assessment of OptiMind's formulation and execution"
 }}
 """
 
-EXPLANATION_PROMPT = """You are a senior management consultant presenting optimization results to a non-technical executive audience. Your tone is professional, clear, and actionable.
+EXPLANATION_PROMPT = """You are a senior consultant with deep expertise in optimization and operations research, presenting results to a mixed audience. In Part 1 you speak to executives; in Part 2 you speak to technical stakeholders with correct optimization terminology and notation.
 
 ## The Problem
 
@@ -232,7 +239,7 @@ Write a two-part response:
 **PART 1 — EXECUTIVE SUMMARY**
 
 Write a clear, jargon-free explanation of:
-- What was being optimized and why
+- What was being optimized and why (business context)
 - What the optimal solution recommends (specific numbers and actions)
 - What the expected outcome is (the objective value, in business terms)
 - Any key trade-offs or considerations
@@ -241,13 +248,13 @@ Write this as if advising a CEO. No math, no code. Use concrete language ("produ
 
 **PART 2 — TECHNICAL APPENDIX**
 
-Present the mathematical details for technical stakeholders:
-- The objective function (in LaTeX/math notation)
-- All constraints (in LaTeX/math notation)
-- The generated solver code
-- The solver output and optimal value
+Present the mathematical and implementation details for technical stakeholders (e.g., analysts or OR practitioners):
+- The objective function in standard form (LaTeX/math notation; state maximize vs minimize)
+- All constraints in clear mathematical form (LaTeX), with a brief note on what each encodes
+- The generated solver code (as provided)
+- The solver output and reported optimal value
 
-Separate the two parts with the line: --- TECHNICAL APPENDIX ---
+Use precise optimization terminology (objective, constraints, variables, feasibility, optimal value). Separate the two parts with the line: --- TECHNICAL APPENDIX ---
 """
 
 
