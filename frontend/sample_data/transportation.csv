@@ -1,0 +1,10 @@
+route,from_location,to_location,distance_km,transport_cost,capacity,delivery_time_hours
+Route_1,Warehouse_A,Customer_1,50,120,500,2
+Route_2,Warehouse_A,Customer_2,75,180,500,3
+Route_3,Warehouse_A,Customer_3,40,100,500,1.5
+Route_4,Warehouse_B,Customer_1,80,200,600,3
+Route_5,Warehouse_B,Customer_2,45,110,600,2
+Route_6,Warehouse_B,Customer_3,90,220,600,3.5
+Route_7,Warehouse_C,Customer_1,60,150,400,2.5
+Route_8,Warehouse_C,Customer_2,85,210,400,3
+Route_9,Warehouse_C,Customer_3,55,140,400,2

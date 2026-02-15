@@ -99,12 +99,16 @@ export interface OptimizationResult {
   objective_value: number;  // The optimal value found
   key_metrics: Record<string, number>;  // Decision variables for chart
   direction: 'maximize' | 'minimize';
+  report_content?: string;  // NEW: Full report.md content
+  baseline_comparison?: string;  // NEW: Baseline comparison section
+  has_baseline_comparison?: boolean;  // NEW: Flag
+  executive_summary?: string;  // NEW: Executive summary
 }
 
 // ===== Backend File System Types =====
 
 /**
- * Structure of verdict.json from backend
+ * Structure of verdict.json from backend (WITH BASELINE)
  */
 export interface VerDict {
   winner: 'optimus' | 'optimind';
@@ -125,6 +129,9 @@ export interface VerDict {
   optimind_assessment: string;  // NOT shown to user
   explanation: string;  // Shown to user
   technical_details: string;  // Shown to user
+  baseline_comparison?: string;  // NEW: Baseline comparison section from consultant
+  has_baseline_comparison?: boolean;  // NEW: Flag indicating if baseline exists
+  executive_summary?: string;  // NEW: Executive summary from consultant
 }
 
 /**

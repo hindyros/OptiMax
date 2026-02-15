@@ -3,26 +3,35 @@
  *
  * Utilities for reading/writing files in the backend directory.
  * These handle communication between Next.js and the Python backend via files.
+ *
+ * NEW STRUCTURE:
+ * - desc.txt goes to data_upload/ (contains problem + baseline)
+ * - Multiple CSV files go to data_upload/
+ * - Backend runs main.py to process everything
  */
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { VerDict, ParamsJSON, OptimizationStage } from '../types';
+import { VerDict,  ParamsJSON, OptimizationStage } from '../types';
 import { getBackendPath } from './python-runner';
 
 /**
- * Write the problem description to desc.txt
+ * Write the problem description + baseline to desc.txt in data_upload/
  *
- * This is the input for OptiMUS pipeline
+ * This file contains the full problem description and baseline assessment
  */
-export async function writeDescriptionFile(description: string): Promise<void> {
-  const descPath = path.join(getBackendPath(), 'current_query', 'desc.txt');
+export async function writeDescriptionToDataUpload(description: string): Promise<void> {
+  const descPath = path.join(getBackendPath(), 'data_upload', 'desc.txt');
 
-  console.log('[FileOps] Writing desc.txt...');
+  console.log('[FileOps] Writing desc.txt to data_upload/...');
 
   try {
+    // Ensure data_upload directory exists
+    const dataUploadDir = path.join(getBackendPath(), 'data_upload');
+    await fs.mkdir(dataUploadDir, { recursive: true });
+
     await fs.writeFile(descPath, description, 'utf-8');
-    console.log('[FileOps] ✓ desc.txt written');
+    console.log('[FileOps] ✓ desc.txt written to data_upload/');
   } catch (error: any) {
     console.error('[FileOps] Failed to write desc.txt:', error.message);
     throw new Error(`Failed to write description file: ${error.message}`);
@@ -30,27 +39,81 @@ export async function writeDescriptionFile(description: string): Promise<void> {
 }
 
 /**
- * Write parameters to params.json
+ * Write CSV files to data_upload/
  *
- * If params is null, OptiMUS will extract them from the description
+ * Handles multiple CSV file uploads
  */
-export async function writeParamsFile(params: ParamsJSON | null): Promise<void> {
-  const paramsPath = path.join(getBackendPath(), 'current_query', 'params.json');
+export async function writeCsvFilesToDataUpload(files: { name: string; content: Buffer }[]): Promise<void> {
+  const dataUploadDir = path.join(getBackendPath(), 'data_upload');
 
-  console.log('[FileOps] Writing params.json...');
+  console.log(`[FileOps] Writing ${files.length} CSV file(s) to data_upload/...`);
 
   try {
-    if (params === null) {
-      // Write empty object - OptiMUS will extract params from desc.txt
-      await fs.writeFile(paramsPath, JSON.stringify({}, null, 2), 'utf-8');
-      console.log('[FileOps] ✓ params.json written (empty - will be extracted)');
-    } else {
-      await fs.writeFile(paramsPath, JSON.stringify(params, null, 2), 'utf-8');
-      console.log('[FileOps] ✓ params.json written with user-provided data');
+    // Ensure data_upload directory exists
+    await fs.mkdir(dataUploadDir, { recursive: true });
+
+    // Write each CSV file
+    for (const file of files) {
+      const filePath = path.join(dataUploadDir, file.name);
+      await fs.writeFile(filePath, file.content);
+      console.log(`[FileOps] ✓ ${file.name} written to data_upload/`);
     }
   } catch (error: any) {
-    console.error('[FileOps] Failed to write params.json:', error.message);
-    throw new Error(`Failed to write params file: ${error.message}`);
+    console.error('[FileOps] Failed to write CSV files:', error.message);
+    throw new Error(`Failed to write CSV files: ${error.message}`);
+  }
+}
+
+/**
+ * Clear data_upload directory before new job
+ */
+export async function clearDataUpload(): Promise<void> {
+  const dataUploadDir = path.join(getBackendPath(), 'data_upload');
+
+  console.log('[FileOps] Clearing data_upload directory...');
+
+  try {
+    // Read all files in data_upload
+    const files = await fs.readdir(dataUploadDir);
+
+    // Delete each file
+    for (const file of files) {
+      const filePath = path.join(dataUploadDir, file);
+      await fs.unlink(filePath);
+    }
+
+    console.log('[FileOps] ✓ data_upload cleared');
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      // Directory doesn't exist, create it
+      await fs.mkdir(dataUploadDir, { recursive: true });
+      console.log('[FileOps] ✓ data_upload directory created');
+    } else {
+      console.error('[FileOps] Failed to clear data_upload:', error.message);
+      throw new Error(`Failed to clear data_upload: ${error.message}`);
+    }
+  }
+}
+
+/**
+ * Clear current_query directory before new job
+ * This fixes the issue where progress gets stuck at 15% on subsequent runs
+ */
+export async function clearCurrentQuery(): Promise<void> {
+  const currentQueryDir = path.join(getBackendPath(), 'current_query');
+
+  console.log('[FileOps] Clearing current_query directory...');
+
+  try {
+    // Recursively delete the entire current_query directory
+    await fs.rm(currentQueryDir, { recursive: true, force: true });
+    console.log('[FileOps] ✓ current_query cleared');
+  } catch (error: any) {
+    // If it doesn't exist, that's fine
+    if (error.code !== 'ENOENT') {
+      console.error('[FileOps] Failed to clear current_query:', error.message);
+      throw new Error(`Failed to clear current_query: ${error.message}`);
+    }
   }
 }
 
@@ -83,49 +146,81 @@ export async function readVerdictFile(): Promise<VerDict> {
 }
 
 /**
- * Check which optimization stage files exist
+ * Check which optimization stage the pipeline is currently in
  *
- * This lets us track progress by polling for state_*.json files
+ * NEW PIPELINE STAGES (Unified Optima branding):
+ * 1. preprocessing - Converting raw inputs to structured format
+ * 2. analyzing - Analyzing parameters and constraints
+ * 3. solving - Running optimization algorithms
+ * 4. finalizing - Generating final report with baseline comparison
+ * 5. complete - Ready to view results
  */
 export async function getCurrentOptimizationStage(): Promise<{
-  stage: OptimizationStage;
+  stage: string;
   progress: number;
+  message: string;
 }> {
-  const optimusOutputPath = path.join(
-    getBackendPath(),
-    'current_query',
-    'optimus_output'
-  );
+  const backendPath = getBackendPath();
 
-  // Define stage files and their progress percentages
-  const stageFiles: Record<string, { stage: OptimizationStage; progress: number }> = {
-    'state_1_params.json': { stage: 'state_1_params', progress: 14 },
-    'state_2_objective.json': { stage: 'state_2_objective', progress: 28 },
-    'state_3_constraints.json': { stage: 'state_3_constraints', progress: 42 },
-    'state_4_constraints_modeled.json': { stage: 'state_4_constraints_modeled', progress: 57 },
-    'state_5_objective_modeled.json': { stage: 'state_5_objective_modeled', progress: 71 },
-    'state_6_code.json': { stage: 'state_6_code', progress: 85 },
-    'code_output.txt': { stage: 'executing', progress: 95 },
-  };
+  // Check stages in order (unified Optima branding - don't show individual solvers)
+  const stages = [
+    {
+      file: 'current_query/model_input/desc.txt',
+      stage: 'preprocessing',
+      progress: 15,
+      message: 'Preprocessing your data and problem description...',
+    },
+    {
+      file: 'current_query/optimus_output/state_1_params.json',
+      stage: 'analyzing',
+      progress: 35,
+      message: 'Optima is analyzing parameters and constraints...',
+    },
+    {
+      file: 'current_query/optimus_output/state_6_code.json',
+      stage: 'solving',
+      progress: 60,
+      message: 'Optima is solving your optimization problem...',
+    },
+    {
+      file: 'current_query/final_output/verdict.json',
+      stage: 'finalizing',
+      progress: 85,
+      message: 'Generating executive report and baseline comparison...',
+    },
+    {
+      file: 'current_query/final_output/report.md',
+      stage: 'complete',
+      progress: 100,
+      message: 'Optimization complete! Your results are ready.',
+    },
+  ];
 
-  // Check files in reverse order to find the latest completed stage
-  const fileNames = Object.keys(stageFiles).reverse();
-
-  for (const fileName of fileNames) {
-    const filePath = path.join(optimusOutputPath, fileName);
+  // Check stages in reverse order to find the latest completed stage
+  for (let i = stages.length - 1; i >= 0; i--) {
+    const stageInfo = stages[i];
+    const filePath = path.join(backendPath, stageInfo.file);
 
     try {
-      await fs.access(filePath);  // Check if file exists
-      // File exists - this is the current stage
-      return stageFiles[fileName];
+      await fs.access(filePath);
+      // File exists - this stage is complete/running
+      return {
+        stage: stageInfo.stage,
+        progress: stageInfo.progress,
+        message: stageInfo.message,
+      };
     } catch {
-      // File doesn't exist yet, keep checking earlier stages
+      // File doesn't exist yet, check previous stages
       continue;
     }
   }
 
-  // No stage files exist yet - optimization hasn't started
-  return { stage: 'state_1_params', progress: 0 };
+  // No stage files exist yet - just started
+  return {
+    stage: 'initializing',
+    progress: 5,
+    message: 'Initializing optimization pipeline...',
+  };
 }
 
 /**
@@ -144,6 +239,33 @@ export async function isOptimizationComplete(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Read the professional report.md from backend NEW
+ *
+ * This contains the full consultant-generated report with baseline comparison
+ */
+export async function readReportFile(): Promise<string> {
+  const reportPath = path.join(
+    getBackendPath(),
+    'current_query',
+    'final_output',
+    'report.md'
+  );
+
+  console.log('[FileOps] Reading report.md...');
+
+  try {
+    const reportData = await fs.readFile(reportPath, 'utf-8');
+
+    console.log('[FileOps] ✓ report.md read successfully');
+
+    return reportData;
+  } catch (error: any) {
+    console.error('[FileOps] Failed to read report.md:', error.message);
+    throw new Error(`Failed to read report file: ${error.message}`);
   }
 }
 

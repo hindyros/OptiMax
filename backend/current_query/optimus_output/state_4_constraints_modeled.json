@@ -151,5 +151,94 @@
             "definition": "Annual profit for catering shop when 3 stores",
             "type": "integer"
         }
+    },
+    "objective": {
+        "description": "\"The goal is to maximize the total rental income from leasing stores to tenants\"",
+        "formulation": null,
+        "code": null
+    },
+    "constraints": [
+        {
+            "description": "Total area occupied by all stores should not exceed the total available space of 5000 m\u00b2",
+            "formulation": "$NumJewelry \\\\times AreaJewelry + NumShoesHats \\\\times AreaShoesHats + NumGeneralMerch \\\\times AreaGeneralMerch + NumBookstore \\\\times AreaBookstore + NumCatering \\\\times AreaCatering \\\\leq TotalSpace$",
+            "code": null
+        },
+        {
+            "description": "Number of jewelry shops should be at least the minimum required",
+            "formulation": "$NumJewelry \\geq MinJewelry$",
+            "code": null
+        },
+        {
+            "description": "Number of shoes & hats shops should be at least the minimum required",
+            "formulation": "$NumShoesHats \\\\geq MinShoesHats$",
+            "code": null
+        },
+        {
+            "description": "Number of general merchandise shops should be at least the minimum required",
+            "formulation": "$NumGeneralMerch \\geq MinGeneralMerch$",
+            "code": null
+        },
+        {
+            "description": "Number of bookstores should be at least the minimum required",
+            "formulation": "$NumBookstore \\geq MinBookstore$",
+            "code": null
+        },
+        {
+            "description": "Number of catering shops should be at least the minimum required",
+            "formulation": "$NumCatering \\geq MinCatering$",
+            "code": null
+        },
+        {
+            "description": "Number of jewelry shops should not exceed the maximum allowed",
+            "formulation": "$NumJewelry \\leq MaxJewelry$",
+            "code": null
+        },
+        {
+            "description": "Number of shoes & hats shops should not exceed the maximum allowed",
+            "formulation": "$NumShoesHats \\\\leq MaxShoesHats$",
+            "code": null
+        },
+        {
+            "description": "Number of general merchandise shops should not exceed the maximum allowed",
+            "formulation": "$NumGeneralMerch \\\\leq MaxGeneralMerch$",
+            "code": null
+        },
+        {
+            "description": "Number of bookstores should not exceed the maximum allowed",
+            "formulation": "$NumBookstore \\\\leq MaxBookstore$",
+            "code": null
+        },
+        {
+            "description": "Number of catering shops should not exceed the maximum allowed",
+            "formulation": "$NumCatering \\\\leq MaxCatering$",
+            "code": null
+        }
+    ],
+    "variables": {
+        "NumJewelry": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of jewelry stores to lease"
+        },
+        "NumShoesHats": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of shoes & hats stores to lease"
+        },
+        "NumGeneralMerch": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of general merchandise stores to lease"
+        },
+        "NumBookstore": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of bookstores to lease"
+        },
+        "NumCatering": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of catering stores to lease"
+        }
     }
 }

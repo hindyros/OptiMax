@@ -151,5 +151,67 @@
             "definition": "Annual profit for catering shop when 3 stores",
             "type": "integer"
         }
-    }
+    },
+    "objective": {
+        "description": "\"The goal is to maximize the total rental income from leasing stores to tenants\"",
+        "formulation": null,
+        "code": null
+    },
+    "constraints": [
+        {
+            "description": "Total area occupied by all stores should not exceed the total available space of 5000 m\u00b2",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of jewelry shops should be at least the minimum required",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of shoes & hats shops should be at least the minimum required",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of general merchandise shops should be at least the minimum required",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of bookstores should be at least the minimum required",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of catering shops should be at least the minimum required",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of jewelry shops should not exceed the maximum allowed",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of shoes & hats shops should not exceed the maximum allowed",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of general merchandise shops should not exceed the maximum allowed",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of bookstores should not exceed the maximum allowed",
+            "formulation": null,
+            "code": null
+        },
+        {
+            "description": "Number of catering shops should not exceed the maximum allowed",
+            "formulation": null,
+            "code": null
+        }
+    ]
 }

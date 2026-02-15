@@ -1,0 +1,8 @@
+item,value,weight,volume,quantity_available
+Item_A,100,10,5,20
+Item_B,150,15,8,15
+Item_C,80,8,4,25
+Item_D,200,20,12,10
+Item_E,120,12,6,18
+Item_F,90,9,5,22
+Item_G,180,18,10,12

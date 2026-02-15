@@ -151,5 +151,94 @@
             "definition": "Annual profit for catering shop when 3 stores",
             "type": "integer"
         }
+    },
+    "objective": {
+        "description": "\"The goal is to maximize the total rental income from leasing stores to tenants\"",
+        "formulation": "$\\max RentPercentage \\times (NumJewelry \\times ProfitJewelry + NumShoesHats \\times ProfitShoesHats + NumGeneralMerch \\times ProfitGeneralMerch + NumBookstore \\times ProfitBookstore + NumCatering \\times ProfitCatering)$",
+        "code": "model.setObjective(\n    RentPercentage * (\n        (NumJewelry * ProfitJewelry1) * (NumJewelry == 1) +\n        (NumJewelry * ProfitJewelry2) * (NumJewelry == 2) +\n        (NumJewelry * ProfitJewelry3) * (NumJewelry == 3) +\n        \n        (NumShoesHats * ProfitShoesHats1) * (NumShoesHats == 1) +\n        (NumShoesHats * ProfitShoesHats2) * (NumShoesHats == 2) +\n        \n        (NumGeneralMerch * ProfitGeneralMerch1) * (NumGeneralMerch == 1) +\n        (NumGeneralMerch * ProfitGeneralMerch2) * (NumGeneralMerch == 2) +\n        (NumGeneralMerch * ProfitGeneralMerch3) * (NumGeneralMerch == 3) +\n        \n        (NumBookstore * ProfitBookstore1) * (NumBookstore == 1) +\n        (NumBookstore * ProfitBookstore2) * (NumBookstore == 2) +\n        \n        (NumCatering * ProfitCatering1) * (NumCatering == 1) +\n        (NumCatering * ProfitCatering2) * (NumCatering == 2) +\n        (NumCatering * ProfitCatering3) * (NumCatering == 3)\n    ), \n    GRB.MAXIMIZE\n)"
+    },
+    "constraints": [
+        {
+            "description": "Total area occupied by all stores should not exceed the total available space of 5000 m\u00b2",
+            "formulation": "$NumJewelry \\\\times AreaJewelry + NumShoesHats \\\\times AreaShoesHats + NumGeneralMerch \\\\times AreaGeneralMerch + NumBookstore \\\\times AreaBookstore + NumCatering \\\\times AreaCatering \\\\leq TotalSpace$",
+            "code": "model.addConstr(NumJewelry * AreaJewelry + NumShoesHats * AreaShoesHats + NumGeneralMerch * AreaGeneralMerch + NumBookstore * AreaBookstore + NumCatering * AreaCatering <= TotalSpace)"
+        },
+        {
+            "description": "Number of jewelry shops should be at least the minimum required",
+            "formulation": "$NumJewelry \\geq MinJewelry$",
+            "code": "model.addConstr(NumJewelry >= MinJewelry)"
+        },
+        {
+            "description": "Number of shoes & hats shops should be at least the minimum required",
+            "formulation": "$NumShoesHats \\\\geq MinShoesHats$",
+            "code": "model.addConstr(NumShoesHats >= MinShoesHats)"
+        },
+        {
+            "description": "Number of general merchandise shops should be at least the minimum required",
+            "formulation": "$NumGeneralMerch \\geq MinGeneralMerch$",
+            "code": "model.addConstr(NumGeneralMerch >= MinGeneralMerch)"
+        },
+        {
+            "description": "Number of bookstores should be at least the minimum required",
+            "formulation": "$NumBookstore \\geq MinBookstore$",
+            "code": "model.addConstr(NumBookstore >= MinBookstore)"
+        },
+        {
+            "description": "Number of catering shops should be at least the minimum required",
+            "formulation": "$NumCatering \\geq MinCatering$",
+            "code": "model.addConstr(NumCatering >= MinCatering)"
+        },
+        {
+            "description": "Number of jewelry shops should not exceed the maximum allowed",
+            "formulation": "$NumJewelry \\leq MaxJewelry$",
+            "code": "model.addConstr(NumJewelry <= MaxJewelry)"
+        },
+        {
+            "description": "Number of shoes & hats shops should not exceed the maximum allowed",
+            "formulation": "$NumShoesHats \\\\leq MaxShoesHats$",
+            "code": "model.addConstr(NumShoesHats <= MaxShoesHats)"
+        },
+        {
+            "description": "Number of general merchandise shops should not exceed the maximum allowed",
+            "formulation": "$NumGeneralMerch \\\\leq MaxGeneralMerch$",
+            "code": "model.addConstr(NumGeneralMerch <= MaxGeneralMerch)"
+        },
+        {
+            "description": "Number of bookstores should not exceed the maximum allowed",
+            "formulation": "$NumBookstore \\\\leq MaxBookstore$",
+            "code": "model.addConstr(NumBookstore <= MaxBookstore)"
+        },
+        {
+            "description": "Number of catering shops should not exceed the maximum allowed",
+            "formulation": "$NumCatering \\\\leq MaxCatering$",
+            "code": "model.addConstr(NumCatering <= MaxCatering)"
+        }
+    ],
+    "variables": {
+        "NumJewelry": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of jewelry stores to lease"
+        },
+        "NumShoesHats": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of shoes & hats stores to lease"
+        },
+        "NumGeneralMerch": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of general merchandise stores to lease"
+        },
+        "NumBookstore": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of bookstores to lease"
+        },
+        "NumCatering": {
+            "shape": [],
+            "type": "integer",
+            "definition": "Number of catering stores to lease"
+        }
     }
 }

@@ -14,10 +14,12 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
+import rehypeKatex from 'rehype-katex';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 
 interface OptimizationResult {
@@ -26,6 +28,10 @@ interface OptimizationResult {
   objective_value: number;
   key_metrics: Record<string, number>;
   direction: 'maximize' | 'minimize';
+  report_content?: string;  // NEW: Full report.md content
+  baseline_comparison?: string;  // NEW: Baseline comparison section
+  has_baseline_comparison?: boolean;  // NEW: Flag
+  executive_summary?: string;  // NEW: Executive summary
 }
 
 export default function ResultsPage() {
@@ -68,6 +74,44 @@ export default function ResultsPage() {
 
     fetchResults();
   }, [jobId]);
+
+  /**
+   * Download report as PDF
+   */
+  const handleDownloadPDF = async () => {
+    if (!result?.report_content) return;
+
+    try {
+      const response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          markdown: result.report_content,
+          jobId: jobId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Download the PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `optima-report-${jobId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error('PDF generation error:', err);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
 
   /**
    * Generate HeyGen AI presentation
@@ -163,10 +207,10 @@ export default function ResultsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-surface/30 particle-bg">
         <div className="text-center">
-          <div className="text-4xl mb-4">📊</div>
-          <p className="text-foreground-dim">Loading results...</p>
+          <div className="text-4xl sm:text-5xl mb-4 animate-pulse">📊</div>
+          <p className="text-foreground-dim text-sm sm:text-base">Loading results...</p>
         </div>
       </div>
     );
@@ -174,14 +218,18 @@ export default function ResultsPage() {
 
   if (error || !result) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="max-w-md w-full bg-surface border border-error rounded-lg p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
+        {/* Floating orbs */}
+        <div className="absolute top-20 left-10 w-64 h-64 bg-error/10 rounded-full blur-3xl animate-float" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-error/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+
+        <div className="max-w-md w-full glass-card gradient-border rounded-2xl p-6 sm:p-8 text-center relative z-10">
           <div className="text-5xl mb-4">❌</div>
           <h2 className="text-2xl font-bold text-error mb-4">Failed to Load Results</h2>
           <p className="text-foreground-dim mb-6">{error || 'Unknown error'}</p>
           <button
             onClick={() => router.push('/refine')}
-            className="px-6 py-2 bg-primary text-background font-semibold rounded-lg hover:bg-opacity-90 transition-all"
+            className="btn-gradient px-6 py-2 text-background font-semibold rounded-lg shadow-lg"
           >
             Start New Optimization
           </button>
@@ -196,17 +244,28 @@ export default function ResultsPage() {
     .map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
+      {/* Animated floating orbs */}
+      <div className="absolute top-20 left-10 w-64 h-64 bg-success/10 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }} />
+
+      <div className="max-w-xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto space-y-6 sm:space-y-8 relative z-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center"
+          className="text-center px-4"
         >
-          <div className="text-6xl mb-4">✨</div>
-          <h1 className="text-4xl font-bold text-foreground mb-2">Optimization Complete</h1>
-          <p className="text-foreground-dim">
+          <motion.div
+            className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 inline-block"
+            animate={{ scale: [1, 1.1, 1], rotate: [0, 10, -10, 0] }}
+            transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+          >
+            ✨
+          </motion.div>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold gradient-text neon-glow mb-2 sm:mb-3">Optimization Complete</h1>
+          <p className="text-foreground-dim text-sm sm:text-base md:text-lg">
             Your optimal solution has been found and verified.
           </p>
         </motion.div>
@@ -216,7 +275,7 @@ export default function ResultsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
         >
           {Object.entries(result.key_metrics).map(([key, value], index) => (
             <MetricCard key={key} label={key} value={value} delay={index * 0.05} />
@@ -229,15 +288,15 @@ export default function ResultsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-surface border border-border rounded-lg p-6"
+            className="glass-card gradient-border rounded-2xl p-4 sm:p-6"
           >
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold text-foreground mb-2">Decision Variables</h2>
-              <p className="text-sm text-foreground-dim">
+            <div className="mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold gradient-text mb-1 sm:mb-2">Decision Variables</h2>
+              <p className="text-xs sm:text-sm text-foreground-dim">
                 Optimal values for each decision variable in your problem
               </p>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#45475a" />
                 <XAxis dataKey="name" stroke="#cdd6f4" />
@@ -256,55 +315,28 @@ export default function ResultsPage() {
           </motion.div>
         )}
 
-        {/* Explanation */}
+        {/* Full Report (Display report.md content with all sections) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-surface border border-border rounded-lg p-8"
+          className="glass-card gradient-border rounded-2xl p-4 sm:p-6 md:p-8"
         >
-          <h2 className="text-2xl font-semibold text-foreground mb-6">Executive Summary</h2>
-          <div className="prose prose-invert max-w-none">
-            <ReactMarkdown
-              components={{
-                p: ({ node, ...props }) => <p className="text-foreground-dim mb-4" {...props} />,
-                strong: ({ node, ...props }) => <strong className="text-foreground font-semibold" {...props} />,
-                ul: ({ node, ...props }) => <ul className="list-disc list-inside text-foreground-dim space-y-2" {...props} />,
-                ol: ({ node, ...props }) => <ol className="list-decimal list-inside text-foreground-dim space-y-2" {...props} />,
-              }}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-semibold gradient-text">Optimization Report</h2>
+            <button
+              onClick={handleDownloadPDF}
+              className="btn-gradient px-3 sm:px-4 py-2 text-background text-sm sm:text-base font-semibold rounded-lg shadow-lg flex items-center gap-2 card-hover w-full sm:w-auto justify-center"
+              title="Download report as PDF"
             >
-              {result.explanation}
-            </ReactMarkdown>
+              <span>📄</span>
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </button>
           </div>
-        </motion.div>
-
-        {/* Technical Details (Collapsible) */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-surface border border-border rounded-lg"
-        >
-          <button
-            onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-            className="w-full p-6 flex items-center justify-between hover:bg-code-bg transition-all"
-          >
-            <h2 className="text-xl font-semibold text-foreground">Technical Details</h2>
-            <span className="text-2xl text-primary">
-              {showTechnicalDetails ? '▼' : '▶'}
-            </span>
-          </button>
-
-          {showTechnicalDetails && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="border-t border-border p-6 space-y-6"
-            >
-              <TechnicalDetailsContent content={result.technical_details} />
-            </motion.div>
-          )}
+          <div className="prose prose-invert max-w-none">
+            <MarkdownRenderer content={result.report_content || result.explanation} />
+          </div>
         </motion.div>
 
         {/* AI Presentation Section */}
@@ -312,10 +344,10 @@ export default function ResultsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-surface border border-border rounded-lg p-8"
+            transition={{ delay: 0.4 }}
+            className="glass-card gradient-border rounded-2xl p-4 sm:p-6 md:p-8"
           >
-            <h2 className="text-2xl font-semibold text-foreground mb-6 text-center">
+            <h2 className="text-xl sm:text-2xl font-semibold gradient-text mb-4 sm:mb-6 text-center">
               🎬 AI Presentation
             </h2>
             <div className="aspect-video rounded-lg overflow-hidden bg-code-bg">
@@ -339,11 +371,11 @@ export default function ResultsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="flex justify-center space-x-4 flex-wrap gap-4"
+          className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4"
         >
           <button
             onClick={() => router.push('/refine')}
-            className="px-6 py-3 bg-primary text-background font-semibold rounded-lg hover:bg-opacity-90 transition-all"
+            className="btn-gradient px-6 sm:px-8 py-2.5 sm:py-3 text-background text-sm sm:text-base font-semibold rounded-xl shadow-lg card-hover"
           >
             Solve Another Problem
           </button>
@@ -352,7 +384,7 @@ export default function ResultsPage() {
             <button
               onClick={handleGenerateAIPresentation}
               disabled={isGeneratingVideo}
-              className="px-6 py-3 bg-accent text-background font-semibold rounded-lg hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 sm:px-8 py-2.5 sm:py-3 glass-card gradient-border text-foreground text-sm sm:text-base font-semibold rounded-xl card-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGeneratingVideo ? (
                 <>
@@ -367,6 +399,141 @@ export default function ResultsPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Markdown Renderer Component
+ * Properly renders report.md with LaTeX, code highlighting, and tables
+ */
+function MarkdownRenderer({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkMath, remarkGfm]}
+      rehypePlugins={[rehypeKatex]}
+      components={{
+        // Headings
+        h1: ({ node, ...props }) => (
+          <h1 className="text-3xl font-bold text-foreground mt-8 mb-4 border-b border-border pb-2" {...props} />
+        ),
+        h2: ({ node, ...props }) => (
+          <h2 className="text-2xl font-semibold text-foreground mt-6 mb-3" {...props} />
+        ),
+        h3: ({ node, ...props }) => (
+          <h3 className="text-xl font-semibold text-foreground mt-4 mb-2" {...props} />
+        ),
+        h4: ({ node, ...props }) => (
+          <h4 className="text-lg font-semibold text-foreground mt-3 mb-2" {...props} />
+        ),
+
+        // Paragraphs and text
+        p: ({ node, ...props }) => (
+          <p className="text-foreground-dim mb-4 leading-relaxed" {...props} />
+        ),
+        strong: ({ node, ...props }) => (
+          <strong className="text-foreground font-semibold" {...props} />
+        ),
+        em: ({ node, ...props }) => (
+          <em className="text-foreground-dim italic" {...props} />
+        ),
+
+        // Lists
+        ul: ({ node, ...props }) => (
+          <ul className="list-disc list-inside text-foreground-dim space-y-2 mb-4" {...props} />
+        ),
+        ol: ({ node, ...props }) => (
+          <ol className="list-decimal list-inside text-foreground-dim space-y-2 mb-4" {...props} />
+        ),
+        li: ({ node, ...props }) => (
+          <li className="text-foreground-dim" {...props} />
+        ),
+
+        // Blockquote
+        blockquote: ({ node, ...props }) => (
+          <blockquote className="border-l-4 border-primary pl-4 italic text-foreground-dim my-4 bg-surface/50 py-2" {...props} />
+        ),
+
+        // Tables
+        table: ({ node, ...props }) => (
+          <div className="overflow-x-auto mb-6">
+            <table className="min-w-full border border-border rounded-lg" {...props} />
+          </div>
+        ),
+        thead: ({ node, ...props }) => (
+          <thead className="bg-surface" {...props} />
+        ),
+        tbody: ({ node, ...props }) => (
+          <tbody className="divide-y divide-border" {...props} />
+        ),
+        tr: ({ node, ...props }) => (
+          <tr className="hover:bg-surface/50 transition-colors" {...props} />
+        ),
+        th: ({ node, ...props }) => (
+          <th className="px-4 py-3 text-left text-sm font-semibold text-foreground border-r border-border last:border-r-0" {...props} />
+        ),
+        td: ({ node, ...props }) => (
+          <td className="px-4 py-3 text-sm text-foreground-dim border-r border-border last:border-r-0" {...props} />
+        ),
+
+        // Code blocks and inline code
+        code: ({ node, inline, className, children, ...props }: any) => {
+          const match = /language-(\w+)/.exec(className || '');
+          const language = match ? match[1] : 'Python';
+          const content = String(children).replace(/\n$/, '');
+
+          if (!inline && match) {
+            // Code block with syntax highlighting
+            return (
+              <div className="my-4 rounded-lg overflow-hidden">
+                <SyntaxHighlighter
+                  language={language}
+                  style={vscDarkPlus}
+                  customStyle={{
+                    margin: 0,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    maxWidth: '100%',
+                    padding: '1.5rem',
+                  }}
+                  wrapLongLines={false}
+                  showLineNumbers={false}
+                  {...props}
+                >
+                  {content}
+                </SyntaxHighlighter>
+              </div>
+            );
+          } else {
+            // Inline code (math is handled by rehype-katex)
+            return (
+              <code
+                className="bg-code-bg px-2 py-1 rounded text-sm text-accent font-mono"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          }
+        },
+
+        // Horizontal rule
+        hr: ({ node, ...props }) => (
+          <hr className="my-6 border-border" {...props} />
+        ),
+
+        // Links
+        a: ({ node, ...props }) => (
+          <a
+            className="text-primary hover:text-accent underline transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
+            {...props}
+          />
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
   );
 }
 
@@ -393,127 +560,25 @@ function MetricCard({ label, value, delay }: { label: string; value: number; del
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay }}
-      className="bg-surface border border-border rounded-lg p-6 hover:border-primary transition-all group relative"
+      whileHover={{ y: -5, scale: 1.02 }}
+      className="glass-card gradient-border rounded-2xl p-4 sm:p-6 card-hover group relative overflow-hidden"
       title={getTooltip(label)}
     >
-      <div className="flex items-center gap-2 mb-2">
-        <p className="text-sm text-foreground-dim">{label}</p>
-        <span className="text-xs text-foreground-dim opacity-0 group-hover:opacity-100 transition-opacity">
-          ℹ️
-        </span>
+      {/* Animated glow on hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+      <div className="relative z-10">
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+          <p className="text-xs sm:text-sm text-foreground-dim">{label}</p>
+          <span className="text-xs text-foreground-dim opacity-0 group-hover:opacity-100 transition-opacity">
+            ℹ️
+          </span>
+        </div>
+        <p className="text-2xl sm:text-3xl md:text-4xl font-bold gradient-text">{value.toLocaleString()}</p>
       </div>
-      <p className="text-3xl font-bold text-primary">{value.toLocaleString()}</p>
+
+      {/* Corner accent */}
+      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/20 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
     </motion.div>
-  );
-}
-
-/**
- * Technical Details Content Parser
- * Extracts LaTeX math and code from technical_details
- */
-function TechnicalDetailsContent({ content }: { content: string }) {
-  // Split content into sections
-  const sections = content.split('\n\n');
-
-  return (
-    <div className="space-y-6">
-      {sections.map((section, index) => {
-        // Check if section contains LaTeX math (multiple formats)
-        // Format 1: \[ ... \] (proper LaTeX)
-        const blockMathMatch = section.match(/\\\[([\s\S]*?)\\\]/);
-        // Format 2: $$ ... $$ (display math)
-        const displayMathMatch = section.match(/\$\$([\s\S]*?)\$\$/);
-        // Format 3: [ ... ] (backend format - single brackets)
-        const singleBracketMatch = section.match(/\[\s*\\?([a-z]+[^[]*?)\s*\]/i);
-
-        if (blockMathMatch || displayMathMatch || singleBracketMatch) {
-          const math = (blockMathMatch || displayMathMatch || singleBracketMatch)?.[1] || '';
-          return (
-            <div key={index} className="bg-code-bg p-4 rounded-lg overflow-x-auto border border-border">
-              <BlockMath math={math.trim()} />
-            </div>
-          );
-        }
-
-        // Check if section contains code (wrapped in ```)
-        const codeMatch = section.match(/```(\w+)?\n([\s\S]*?)```/);
-        if (codeMatch) {
-          const [, language = 'python', code] = codeMatch;
-          return (
-            <div key={index} className="rounded-lg overflow-hidden">
-              <SyntaxHighlighter
-                language={language}
-                style={vscDarkPlus}
-                customStyle={{
-                  margin: 0,
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  maxWidth: '100%',
-                  overflowX: 'auto',
-                }}
-                wrapLongLines={false}
-              >
-                {code.trim()}
-              </SyntaxHighlighter>
-            </div>
-          );
-        }
-
-        // Regular text with possible inline math
-        const hasInlineMath = section.includes('$') || section.includes('\\(');
-
-        if (hasInlineMath) {
-          // Parse inline math
-          const parts = section.split(/(\$[^$]+\$|\\\([^)]+\\\))/g);
-          return (
-            <p key={index} className="text-foreground-dim">
-              {parts.map((part, i) => {
-                const inlineMathMatch = part.match(/\$([^$]+)\$|\\\(([^)]+)\\\)/);
-                if (inlineMathMatch) {
-                  const math = inlineMathMatch[1] || inlineMathMatch[2];
-                  return <InlineMath key={i} math={math} />;
-                }
-                return <span key={i}>{part}</span>;
-              })}
-            </p>
-          );
-        }
-
-        // Regular text or markdown headers
-        if (section.startsWith('**')) {
-          const text = section.replace(/\*\*/g, '');
-          return (
-            <h3 key={index} className="text-lg font-semibold text-foreground mt-4">
-              {text}
-            </h3>
-          );
-        }
-
-        // Plain text sections (like Solver Output) - wrap in styled container
-        if (section.trim().length > 0) {
-          // Check if this looks like output/data (contains numbers, equals signs, etc.)
-          const looksLikeOutput = /[:=\d]/.test(section);
-
-          if (looksLikeOutput) {
-            return (
-              <div key={index} className="bg-code-bg/70 p-4 rounded-lg border border-border">
-                <pre className="text-foreground-dim whitespace-pre-wrap font-mono text-sm">
-                  {section}
-                </pre>
-              </div>
-            );
-          }
-
-          // Regular text paragraph
-          return (
-            <p key={index} className="text-foreground-dim">
-              {section}
-            </p>
-          );
-        }
-
-        return null;
-      })}
-    </div>
   );
 }

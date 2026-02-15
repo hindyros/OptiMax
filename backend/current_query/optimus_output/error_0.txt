@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/mildness/Documents/treehacks/OptiMax/backend/current_query/optimus_output/code.py", line 113, in <module>
+    (NumJewelry * ProfitJewelry1) * (NumJewelry == 1) +
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~
+TypeError: unsupported operand type(s) for *: 'gurobipy._core.LinExpr' and 'TempConstr'

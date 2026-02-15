@@ -282,3 +282,137 @@ Return ONLY valid JSON, no additional text.`;
     throw new Error(`Failed to extract parameters: ${error.message}`);
   }
 }
+
+/**
+ * NEW: Baseline Assessment System Prompt
+ *
+ * This is for understanding how the user currently handles their optimization problem
+ */
+const BASELINE_SYSTEM_PROMPT = `You are an expert business consultant helping understand a client's current operations and baseline approach.
+
+The user has described an optimization problem. Now you need to understand their CURRENT approach - how they handle this situation today.
+
+Ask questions to understand:
+1. What is their current method/strategy for handling this problem?
+2. What metrics do they currently achieve? (performance, costs, efficiency, etc.)
+3. What challenges or limitations do they face with their current approach?
+
+Ask questions ONE AT A TIME. Be conversational and empathetic.
+
+Respond in JSON format:
+{
+  "question": "Your baseline assessment question (null if you have enough baseline info)",
+  "baseline_summary": "Summary of their current approach and performance"
+}
+
+IMPORTANT:
+- Maximum 3 questions total (be efficient)
+- Focus on quantifiable metrics if possible
+- When you have a clear understanding of their baseline, set question to null`;
+
+/**
+ * NEW: Start baseline assessment conversation
+ *
+ * This happens AFTER problem description, to understand current state
+ */
+export async function startBaselineAssessment(problemDescription: string): Promise<{
+  question: string | null;
+  baselineSummary: string;
+}> {
+  console.log('[LLM] Starting baseline assessment...');
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: BASELINE_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Problem: ${problemDescription}\n\nNow ask me about my current approach to this problem.`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error('Empty response from LLM');
+    }
+
+    const llmResponse = JSON.parse(content);
+
+    console.log('[LLM] Baseline question generated');
+
+    return {
+      question: llmResponse.question,
+      baselineSummary: llmResponse.baseline_summary || '',
+    };
+  } catch (error: any) {
+    console.error('[LLM] Baseline assessment start failed:', error.message);
+    throw new Error(`Baseline assessment failed: ${error.message}`);
+  }
+}
+
+/**
+ * NEW: Continue baseline assessment
+ *
+ * Takes conversation history and asks follow-up questions (max 3 total)
+ */
+export async function continueBaselineAssessment(
+  problemDescription: string,
+  baselineHistory: { role: 'system' | 'user' | 'assistant'; content: string }[],
+  userResponse: string,
+  iterationCount: number
+): Promise<{
+  question: string | null;
+  baselineSummary: string;
+  ready: boolean;
+}> {
+  console.log(`[LLM] Continuing baseline assessment (iteration ${iterationCount})...`);
+
+  const atMaxIterations = iterationCount >= 3;
+
+  try {
+    const messages = [
+      { role: 'system' as const, content: BASELINE_SYSTEM_PROMPT },
+      { role: 'user' as const, content: `Problem: ${problemDescription}\n\nNow ask me about my current approach.` },
+      ...baselineHistory,
+      { role: 'user' as const, content: userResponse },
+    ];
+
+    if (atMaxIterations) {
+      messages.push({
+        role: 'system' as const,
+        content: 'This is the 3rd question. Summarize the baseline and set question to null.',
+      });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages,
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error('Empty response from LLM');
+    }
+
+    const llmResponse = JSON.parse(content);
+
+    const ready = llmResponse.question === null || atMaxIterations;
+
+    console.log(`[LLM] Baseline ready: ${ready}`);
+
+    return {
+      question: ready ? null : llmResponse.question,
+      baselineSummary: llmResponse.baseline_summary || '',
+      ready,
+    };
+  } catch (error: any) {
+    console.error('[LLM] Baseline assessment continuation failed:', error.message);
+    throw new Error(`Baseline assessment failed: ${error.message}`);
+  }
+}

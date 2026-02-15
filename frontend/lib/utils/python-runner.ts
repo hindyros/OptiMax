@@ -126,3 +126,41 @@ export async function runPythonCommand(command: string): Promise<string> {
     throw new Error(`Python command failed: ${error.message}`);
   }
 }
+
+/**
+ * Run the main optimization pipeline (NEW WORKFLOW)
+ *
+ * Runs: python main.py
+ * This does everything:
+ * 1. Archives previous results
+ * 2. Copies files from data_upload/ to current_query/raw_input/
+ * 3. Runs raw_to_model to convert inputs
+ * 4. Runs OptiMUS and OptiMind solvers in parallel
+ * 5. Runs judge to compare solutions
+ * 6. Runs consultant to generate final report
+ *
+ * Output: verdict.json and report.md in current_query/final_output/
+ *
+ * Note: This is a LONG-RUNNING process (5-15 minutes)
+ */
+export async function runMainPipeline(): Promise<void> {
+  const backendPath = getBackendPath();
+
+  console.log('[Python] Starting main.py pipeline...');
+  console.log('[Python] This will run: raw_to_model → OptiMUS/OptiMind → Judge → Consultant');
+
+  try {
+    const { stdout, stderr } = await execAsync('python main.py', {
+      cwd: backendPath,
+      timeout: 900000,  // 15 minute timeout (can take 10-15 minutes with both solvers)
+    });
+
+    if (stdout) console.log('[Python] main.py stdout:', stdout);
+    if (stderr) console.warn('[Python] main.py stderr:', stderr);
+
+    console.log('[Python] ✓ main.py completed successfully');
+  } catch (error: any) {
+    console.error('[Python] main.py failed:', error.message);
+    throw new Error(`Main pipeline failed: ${error.message}`);
+  }
+}

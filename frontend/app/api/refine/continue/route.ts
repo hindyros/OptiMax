@@ -1,31 +1,26 @@
 /**
  * API Route: POST /api/refine/continue
  *
- * Continues the LLM refinement conversation.
+ * Continues the baseline assessment conversation (NEW WORKFLOW).
  *
  * Flow:
- * 1. User responds to LLM's question
- * 2. Add response to conversation history
- * 3. Call OpenAI to continue refinement
- * 4. Check confidence (internally)
- * 5. If confident enough OR max iterations: ready_for_optimization = true
- * 6. Otherwise:return next question
- *
- * CRITICAL: Confidence is NEVER exposed to user! They just see smooth progression.
+ * 1. Get conversation state
+ * 2. Add user's baseline response
+ * 3. Ask next baseline question (max 3 total)
+ * 4. When baseline is complete, mark ready for optimization
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { continueRefinement, parseUserProvidedData } from '@/lib/utils/llm';
+import { continueBaselineAssessment } from '@/lib/utils/llm';
 import { getConversation, saveConversation } from '@/lib/utils/store';
-import { writeParamsFile } from '@/lib/utils/file-ops';
 
 export async function POST(request: NextRequest) {
-  console.log('\n[API] POST /api/refine/continue');
+  console.log('\n[API] POST /api/refine/continue (Baseline Assessment)');
 
   try {
     // Parse request body
     const body = await request.json();
-    const { conversation_id, user_response } = body;
+    const { conversation_id, user_response, iteration } = body;
 
     if (!conversation_id || !user_response) {
       return NextResponse.json(
@@ -34,74 +29,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[API] Conversation:', conversation_id, '| User response:', user_response.substring(0, 50) + '...');
+    console.log('[API] Conversation:', conversation_id, 'Iteration:', iteration);
 
     // Get existing conversation
     const conversation = getConversation(conversation_id);
     if (!conversation) {
       return NextResponse.json(
-        { error: 'Conversation not found. It may have expired.' },
+        { error: 'Conversation not found' },
         { status: 404 }
       );
     }
 
-    // Add user's response to history
+    // Add user response to history
     conversation.history.push({
       role: 'user',
       content: user_response,
       timestamp: new Date(),
     });
 
-    // Check if user provided data inline (JSON/CSV format)
-    const providedData = parseUserProvidedData(user_response);
-    if (providedData && conversation.needs_data) {
-      console.log('[API] User provided inline data! Writing to params.json...');
+    // Build baseline history (filter out any non-user/assistant messages)
+    const baselineHistory = conversation.history
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
 
-      // Save data to params.json
-      await writeParamsFile(providedData);
-
-      // Mark conversation as having data
-      conversation.needs_data = false;
-      conversation.refined_description = conversation.refined_description || conversation.initial_description;
-
-      // Save and return ready for optimization
-      saveConversation(conversation);
-
-      console.log('[API] ✓ Data received! Ready for optimization.');
-
-      return NextResponse.json({
-        conversation_id,
-        question: null,
-        ready_for_optimization: true,
-        refined_description: conversation.refined_description,
-        needs_data: false,
-      });
-    }
-
-    // Increment iteration
-    conversation.iteration += 1;
-
-    console.log(`[API] Iteration ${conversation.iteration}/5`);
-
-    // Build conversation history for LLM
-    const llmHistory = conversation.history.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
-
-    // Call LLM to continue refinement
-    const llmResponse = await continueRefinement(
-      llmHistory,
+    // Call LLM to continue baseline assessment
+    const llmResponse = await continueBaselineAssessment(
+      conversation.initial_description,
+      baselineHistory,
       user_response,
-      conversation.iteration
+      iteration || conversation.iteration
     );
 
-    // Update conversation state
-    conversation.refined_description = llmResponse.refinedDescription;
-    conversation.confidence = llmResponse.internalConfidence;  // Internal only
-    conversation.needs_data = llmResponse.needsData;  // Track if data is needed
+    // Update conversation with baseline summary
+    conversation.refined_description += `\n\nBASELINE: ${llmResponse.baselineSummary}`;
+    conversation.iteration = (iteration || conversation.iteration) + 1;
 
-    // Add LLM's next question to history (if it exists)
+    // Add LLM's next question to history if exists
     if (llmResponse.question) {
       conversation.history.push({
         role: 'assistant',
@@ -110,30 +75,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Save updated conversation
+    // Update conversation
     saveConversation(conversation);
 
-    // Prepare response (WITHOUT confidence!)
+    // Prepare response
     const response = {
-      conversation_id,
-      question: llmResponse.question,  // null if ready
-      ready_for_optimization: llmResponse.readyForOptimization,
-      refined_description: llmResponse.readyForOptimization ? llmResponse.refinedDescription : undefined,
-      needs_data: llmResponse.needsData,
+      conversation_id: conversation_id,
+      question: llmResponse.question,
+      ready_for_optimization: llmResponse.ready,
+      refined_description: conversation.refined_description,
+      baseline_summary: llmResponse.baselineSummary,
     };
 
-    if (llmResponse.readyForOptimization) {
-      console.log('[API] ✓ Refinement complete! Ready for optimization.');
-    } else {
-      console.log('[API] ✓ Continuing refinement...');
-    }
+    console.log('[API] ✓ Baseline assessment continued, ready:', llmResponse.ready);
 
     return NextResponse.json(response);
   } catch (error: any) {
     console.error('[API] Error in /api/refine/continue:', error.message);
 
     return NextResponse.json(
-      { error: 'Failed to continue refinement', details: error.message },
+      { error: 'Failed to continue baseline assessment', details: error.message },
       { status: 500 }
     );
   }

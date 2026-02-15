@@ -1,62 +1,182 @@
 {
-    "WarehouseCapacity": {
+    "TotalSpace": {
         "shape": [],
-        "definition": "Maximum storage capacity of the warehouse in dan",
+        "definition": "Total available space for lease in the mall",
         "type": "integer",
         "value": 5000
     },
-    "InitialInventory": {
+    "RentPercentage": {
         "shape": [],
-        "definition": "Initial grain inventory on January 1 in dan",
+        "definition": "Percentage of annual profit paid as rent",
+        "type": "float",
+        "value": 0.2
+    },
+    "AreaJewelry": {
+        "shape": [],
+        "definition": "Area occupied by one jewelry shop",
         "type": "integer",
-        "value": 1000
+        "value": 250
     },
-    "InitialFunds": {
+    "AreaShoesHats": {
         "shape": [],
-        "definition": "Initial available funds on January 1 in yuan",
-        "type": "float",
-        "value": 20000
-    },
-    "PurchasePriceMonth1": {
-        "shape": [],
-        "definition": "Purchase price of grain in month 1 in yuan per dan",
-        "type": "float",
-        "value": 2.85
-    },
-    "PurchasePriceMonth2": {
-        "shape": [],
-        "definition": "Purchase price of grain in month 2 in yuan per dan",
-        "type": "float",
-        "value": 3.05
-    },
-    "PurchasePriceMonth3": {
-        "shape": [],
-        "definition": "Purchase price of grain in month 3 in yuan per dan",
-        "type": "float",
-        "value": 2.9
-    },
-    "SellingPriceMonth1": {
-        "shape": [],
-        "definition": "Selling price of grain in month 1 in yuan per dan",
-        "type": "float",
-        "value": 3.1
-    },
-    "SellingPriceMonth2": {
-        "shape": [],
-        "definition": "Selling price of grain in month 2 in yuan per dan",
-        "type": "float",
-        "value": 3.25
-    },
-    "SellingPriceMonth3": {
-        "shape": [],
-        "definition": "Selling price of grain in month 3 in yuan per dan",
-        "type": "float",
-        "value": 2.95
-    },
-    "TargetFinalInventory": {
-        "shape": [],
-        "definition": "Required grain inventory at end of quarter in dan",
+        "definition": "Area occupied by one shoes & hats shop",
         "type": "integer",
-        "value": 2000
+        "value": 350
+    },
+    "AreaGeneralMerch": {
+        "shape": [],
+        "definition": "Area occupied by one general merchandise shop",
+        "type": "integer",
+        "value": 800
+    },
+    "AreaBookstore": {
+        "shape": [],
+        "definition": "Area occupied by one bookstore",
+        "type": "integer",
+        "value": 400
+    },
+    "AreaCatering": {
+        "shape": [],
+        "definition": "Area occupied by one catering shop",
+        "type": "integer",
+        "value": 500
+    },
+    "MinJewelry": {
+        "shape": [],
+        "definition": "Minimum number of jewelry shops",
+        "type": "integer",
+        "value": 1
+    },
+    "MinShoesHats": {
+        "shape": [],
+        "definition": "Minimum number of shoes & hats shops",
+        "type": "integer",
+        "value": 1
+    },
+    "MinGeneralMerch": {
+        "shape": [],
+        "definition": "Minimum number of general merchandise shops",
+        "type": "integer",
+        "value": 1
+    },
+    "MinBookstore": {
+        "shape": [],
+        "definition": "Minimum number of bookstores",
+        "type": "integer",
+        "value": 0
+    },
+    "MinCatering": {
+        "shape": [],
+        "definition": "Minimum number of catering shops",
+        "type": "integer",
+        "value": 1
+    },
+    "MaxJewelry": {
+        "shape": [],
+        "definition": "Maximum number of jewelry shops",
+        "type": "integer",
+        "value": 3
+    },
+    "MaxShoesHats": {
+        "shape": [],
+        "definition": "Maximum number of shoes & hats shops",
+        "type": "integer",
+        "value": 2
+    },
+    "MaxGeneralMerch": {
+        "shape": [],
+        "definition": "Maximum number of general merchandise shops",
+        "type": "integer",
+        "value": 3
+    },
+    "MaxBookstore": {
+        "shape": [],
+        "definition": "Maximum number of bookstores",
+        "type": "integer",
+        "value": 2
+    },
+    "MaxCatering": {
+        "shape": [],
+        "definition": "Maximum number of catering shops",
+        "type": "integer",
+        "value": 3
+    },
+    "ProfitJewelry1": {
+        "shape": [],
+        "definition": "Annual profit for jewelry shop when 1 store",
+        "type": "integer",
+        "value": 9
+    },
+    "ProfitJewelry2": {
+        "shape": [],
+        "definition": "Annual profit for jewelry shop when 2 stores",
+        "type": "integer",
+        "value": 8
+    },
+    "ProfitJewelry3": {
+        "shape": [],
+        "definition": "Annual profit for jewelry shop when 3 stores",
+        "type": "integer",
+        "value": 7
+    },
+    "ProfitShoesHats1": {
+        "shape": [],
+        "definition": "Annual profit for shoes & hats shop when 1 store",
+        "type": "integer",
+        "value": 10
+    },
+    "ProfitShoesHats2": {
+        "shape": [],
+        "definition": "Annual profit for shoes & hats shop when 2 stores",
+        "type": "integer",
+        "value": 9
+    },
+    "ProfitGeneralMerch1": {
+        "shape": [],
+        "definition": "Annual profit for general merchandise shop when 1 store",
+        "type": "integer",
+        "value": 27
+    },
+    "ProfitGeneralMerch2": {
+        "shape": [],
+        "definition": "Annual profit for general merchandise shop when 2 stores",
+        "type": "integer",
+        "value": 21
+    },
+    "ProfitGeneralMerch3": {
+        "shape": [],
+        "definition": "Annual profit for general merchandise shop when 3 stores",
+        "type": "integer",
+        "value": 20
+    },
+    "ProfitBookstore1": {
+        "shape": [],
+        "definition": "Annual profit for bookstore when 1 store",
+        "type": "integer",
+        "value": 16
+    },
+    "ProfitBookstore2": {
+        "shape": [],
+        "definition": "Annual profit for bookstore when 2 stores",
+        "type": "integer",
+        "value": 10
+    },
+    "ProfitCatering1": {
+        "shape": [],
+        "definition": "Annual profit for catering shop when 1 store",
+        "type": "integer",
+        "value": 17
+    },
+    "ProfitCatering2": {
+        "shape": [],
+        "definition": "Annual profit for catering shop when 2 stores",
+        "type": "integer",
+        "value": 15
+    },
+    "ProfitCatering3": {
+        "shape": [],
+        "definition": "Annual profit for catering shop when 3 stores",
+        "type": "integer",
+        "value": 12
     }
 }

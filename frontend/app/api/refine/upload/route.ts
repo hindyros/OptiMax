@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getConversation, saveConversation } from '../start/route';
+import { getConversation, saveConversation } from '@/lib/utils/store';
 import fs from 'fs/promises';
 import path from 'path';
 

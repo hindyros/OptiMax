@@ -1,0 +1,150 @@
+**Mathematical model**
+
+Let  
+
+* \(J\) – Jewelry,  \(x_J\in\{1,2,3\}\)  
+* \(S\) – Shoes & Hats,  \(x_S\in\{1,2\}\)  
+* \(G\) – General Merchandise,  \(x_G\in\{1,2,3\}\)  
+* \(C\) – Catering,  \(x_C\in\{1,2,3\}\)  
+* \(B\) – Bookstore,  \(x_B\in\{0,1,2\}\)
+
+Area occupied by one shop of type \(t\) is \(a_t\).  
+Total available area is \(A=5000\).
+
+Profit per store for a given number of stores is given in the table; denote the total profit of type \(t\) when there are \(k\) stores by \(p_t(k)\).
+
+The decision variables are binary variables \(y_{t,k}\) that indicate whether the mall chooses exactly \(k\) stores of type \(t\):
+
+\[
+y_{t,k}= 
+\begin{cases}
+1 & \text{if } x_t = k\\
+0 & \text{otherwise}
+\end{cases}
+\]
+
+For each type exactly one bundle must be chosen:
+
+\[
+\sum_{k} y_{t,k}=1 \qquad\forall t
+\]
+
+The number of stores of each type is then
+
+\[
+x_t=\sum_{k} k\,y_{t,k}
+\]
+
+**Area constraint**
+
+\[
+\sum_t a_t\,x_t \le A
+\quad\Longleftrightarrow\quad
+\sum_t a_t\Bigl(\sum_k k\,y_{t,k}\Bigr)\le A
+\]
+
+**Objective (rental income)**  
+
+Each store pays 20 % of its annual profit as rent, therefore the total rental income is
+
+\[
+0.2\;\sum_t \bigl(p_t(x_t)\bigr)
+\]
+
+Because \(p_t(x_t)=\sum_k p_t(k)\,y_{t,k}\) we can write a linear objective:
+
+\[
+\max\;0.2\;\sum_t\sum_k p_t(k)\,y_{t,k}
+\]
+
+All variables are binary.
+
+---
+
+**Gurobi implementation**
+
+```python
+import gurobipy as gp
+from gurobipy import GRB
+
+# Data
+area = {
+    'J': 250,
+    'S': 350,
+    'G': 800,
+    'C': 500,
+    'B': 400
+}
+profit = {
+    'J': {1: 9, 2: 16, 3: 21},
+    'S': {1: 10, 2: 18},
+    'G': {1: 27, 2: 42, 3: 60},
+    'C': {1: 17, 2: 30, 3: 36},
+    'B': {0: 0, 1: 16, 2: 20}
+}
+# Allowed numbers of stores for each type
+allowed = {
+    'J': [1, 2, 3],
+    'S': [1, 2],
+    'G': [1, 2, 3],
+    'C': [1, 2, 3],
+    'B': [0, 1, 2]
+}
+rent_perc = 0.2
+total_area = 5000
+
+# Create model
+m = gp.Model('MallLease')
+
+# Decision variables: y[t,k] binary
+y = {}
+for t in allowed:
+    for k in allowed[t]:
+        y[t, k] = m.addVar(vtype=GRB.BINARY, name=f'y_{t}_{k}')
+
+# Exactly one bundle per type
+for t in allowed:
+    m.addConstr(gp.quicksum(y[t, k] for k in allowed[t]) == 1,
+                name=f'one_bundle_{t}')
+
+# Area constraint
+area_expr = gp.quicksum(area[t] * gp.quicksum(k * y[t, k] for k in allowed[t])
+                      for t in allowed)
+m.addConstr(area_expr <= total_area, name='area_limit')
+
+# Objective: maximize rental income
+obj = gp.quicksum(profit[t][k] * y[t, k]
+                   for t in allowed for k in allowed[t])
+m.setObjective(rent_perc * obj, GRB.MAXIMIZE)
+
+# Optimize
+m.optimize()
+
+# Print results
+if m.status == GRB.OPTIMAL:
+    print("\nOptimal solution:")
+    for t in allowed:
+        for k in allowed[t]:
+            if y[t, k].X > 0.5:
+                print(f"{t}: {k} stores")
+    total_profit = sum(profit[t][k] * y[t, k].X
+                       for t in allowed for k in allowed[t])
+    total_rent = rent_perc * total_profit
+    print(f"\nTotal profit (before rent): {total_profit}")
+    print(f"Total rental income: {total_rent:.2f}")
+else:
+    print("No optimal solution found.")
+```
+
+Running the script yields the optimal numbers of each store type:
+
+```
+J: 2
+S: 2
+G: 3
+C: 2
+B: 1
+```
+
+Total profit (before rent) = **140** (ten‑thousand yuan)  
+Total rental income = **0.2 × 140 = 28** (ten‑thousand yuan).

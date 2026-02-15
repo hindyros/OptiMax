@@ -1,10 +1,12 @@
 /**
  * Optimization Processing Page (/optimize/[jobId])
  *
- * Real-time progress visualization while OptiMUS runs.
+ * Real-time progress visualization while OptiMATE runs.
  *
- * Polls /api/optimize/[jobId]/status every second to get progress updates.
- * Shows current stage, progress bar, and user-friendly messages.
+ * NEW WORKFLOW:
+ * - Polls /api/optimize/[jobId]/status every second
+ * - Shows unified "OptiMATE" branding (not OptiMUS/OptiMind separately)
+ * - Displays: Preprocessing → Analyzing → Solving → Finalizing → Complete
  */
 
 'use client';
@@ -24,51 +26,39 @@ interface JobStatus {
 
 /**
  * Sanitize error messages for user display
- * Converts technical stack traces into user-friendly messages
  */
 function sanitizeError(error: string): string {
-  // Check for common error patterns and return user-friendly messages
-
-  // Generic pipeline/command failures (hide technical details)
-  if (error.includes('OptiMUS pipeline failed') || error.includes('Command failed: python')) {
-    return 'The optimization process encountered an issue. Our team is working to resolve it. Please try again or contact support if the problem persists.';
+  if (error.includes('Main pipeline failed') || error.includes('Command failed: python')) {
+    return 'The optimization process encountered an issue. Please try again or contact support if the problem persists.';
   }
 
-  // Timeout errors
   if (error.includes('timeout') || error.includes('ETIMEDOUT')) {
     return 'The optimization is taking longer than expected. This problem may be too complex. Please try simplifying it or contact support.';
   }
 
-  // Missing Python packages
   if (error.includes('ModuleNotFoundError')) {
     return 'System configuration issue detected. Please contact support or try again later.';
   }
 
-  // Gurobi license issues
   if (error.includes('GurobiError') || error.includes('license')) {
     return 'Solver license configuration issue. Please contact support.';
   }
 
-  // File not found errors
   if (error.includes('FileNotFoundError') || error.includes('No such file')) {
     return 'Required system files are missing. Please contact support.';
   }
 
-  // OpenAI API errors
   if (error.includes('OpenAI') || error.includes('API key')) {
     return 'AI service configuration issue. Please contact support.';
   }
 
-  // Python not found
   if (error.includes('python: not found') || error.includes('command not found')) {
     return 'System configuration issue detected. Please contact support.';
   }
 
-  // Generic fallback - try to extract the last line which often has the actual error
   const lines = error.split('\n').filter(line => line.trim());
   const lastLine = lines[lines.length - 1];
 
-  // If it's a short, readable error without technical jargon, use it
   if (lastLine &&
       lastLine.length < 150 &&
       !lastLine.includes('File "') &&
@@ -78,7 +68,6 @@ function sanitizeError(error: string): string {
     return lastLine;
   }
 
-  // Otherwise, generic message
   return 'We encountered an unexpected issue while processing your request. Please try again or contact support if the problem continues.';
 }
 
@@ -142,8 +131,12 @@ export default function OptimizePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="max-w-lg w-full bg-surface border border-error rounded-lg p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
+        {/* Floating orbs */}
+        <div className="absolute top-20 left-10 w-64 h-64 bg-error/10 rounded-full blur-3xl animate-float" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-error/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+
+        <div className="max-w-md md:max-w-lg w-full glass-card gradient-border rounded-2xl p-6 sm:p-8 text-center relative z-10">
           <div className="text-5xl mb-4">❌</div>
           <h2 className="text-2xl font-bold text-error mb-4">Optimization Failed</h2>
           <p className="text-foreground-dim mb-6 whitespace-pre-wrap wrap-break-word max-w-full">
@@ -152,13 +145,13 @@ export default function OptimizePage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => router.push('/refine')}
-              className="px-6 py-2 bg-primary text-background font-semibold rounded-lg hover:bg-opacity-90 transition-all"
+              className="btn-gradient px-6 py-2 text-background font-semibold rounded-lg shadow-lg"
             >
               Try Again
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-surface border border-border text-foreground font-semibold rounded-lg hover:bg-code-bg transition-all"
+              className="px-6 py-2 glass-card border border-border text-foreground font-semibold rounded-lg card-hover"
             >
               Reload Page
             </button>
@@ -170,9 +163,9 @@ export default function OptimizePage() {
 
   if (!status) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-surface/30 particle-bg">
         <div className="text-center">
-          <div className="text-4xl mb-4">⏳</div>
+          <div className="text-4xl mb-4 animate-pulse">⏳</div>
           <p className="text-foreground-dim">Loading...</p>
         </div>
       </div>
@@ -180,27 +173,45 @@ export default function OptimizePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8">
-      <div className="max-w-2xl w-full">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-gradient-to-br from-background via-background to-surface/30 particle-bg relative overflow-hidden">
+      {/* Animated floating orbs */}
+      <div className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-success/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }} />
+
+      <div className="max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full relative z-10">
          {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-8 sm:mb-10 md:mb-12"
         >
-          <div className="text-6xl mb-4 animate-spin-slow">⚙️</div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Optimizing...</h1>
-          <p className="text-foreground-dim">
-            We're solving your optimization problem. This may take up to 10 minutes.
+          <motion.div
+            className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 inline-block"
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+          >
+            ⚙️
+          </motion.div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+            <span className="text-foreground">Opti</span>
+            <span className="text-primary italic">MATE</span>
+            <span className="text-foreground"> is Working...</span>
+          </h1>
+          {/* <p className="text-foreground-dim">
+            We're solving your optimization problem. This may take up to 10 minutes depending on complexity.
+          </p> */}
+          <p className="text-xs sm:text-sm text-foreground-dim mt-2">
+            Expected processing time: ≤10 mins
           </p>
         </motion.div>
 
-        {/* Progress Bar */}
+        {/* Progress Container with Glassmorphism */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-surface border border-border rounded-lg p-8 space-y-6"
+          className="glass-card gradient-border rounded-2xl p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5 md:space-y-6"
         >
           {/* Current Stage Message */}
           <div className="text-center">
@@ -208,66 +219,85 @@ export default function OptimizePage() {
               key={status.message}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-lg font-semibold text-primary"
+              className="text-base sm:text-lg md:text-xl font-semibold gradient-text"
             >
               {status.message}
             </motion.p>
           </div>
 
-          {/* Progress Bar */}
-          <div className="w-full h-3 bg-code-bg rounded-full overflow-hidden">
+          {/* Progress Bar with Gradient */}
+          <div className="w-full h-3 sm:h-4 bg-code-bg rounded-full overflow-hidden shadow-inner">
             <motion.div
-              className="h-full progress-shimmer rounded-full"
+              className="h-full progress-shimmer rounded-full relative"
               initial={{ width: 0 }}
               animate={{ width: `${status.progress_percent}%` }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
-            />
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary via-accent to-primary animate-gradient bg-size-200" />
+            </motion.div>
           </div>
 
-          {/* Progress Percentage */}
+          {/* Progress Percentage with Glow */}
           <div className="text-center">
             <motion.p
               key={status.progress_percent}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-4xl font-bold text-foreground"
+              className="text-4xl sm:text-5xl md:text-6xl font-bold gradient-text neon-glow"
             >
               {status.progress_percent}%
             </motion.p>
           </div>
 
-          {/* Stage Indicators */}
-          <div className="grid grid-cols-4 gap-2 mt-8">
+          {/* Enhanced Stage Indicators */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-6 sm:mt-8">
             {[
-              { label: 'Extracting', progress: 25 },
-              { label: 'Modeling', progress: 50 },
-              { label: 'Coding', progress: 75 },
-              { label: 'Solving', progress: 100 },
+              { label: 'Preprocessing', progress: 15, icon: '🔍' },
+              { label: 'Analyzing', progress: 35, icon: '🧠' },
+              { label: 'Solving', progress: 60, icon: '⚡' },
+              { label: 'Finalizing', progress: 85, icon: '✨' },
             ].map((stage, index) => (
-              <div key={index} className="text-center">
+              <motion.div
+                key={index}
+                className="text-center"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+              >
+                <div className="mb-1 sm:mb-2 text-xl sm:text-2xl opacity-50">
+                  {status.progress_percent >= stage.progress ? stage.icon : '⭕'}
+                </div>
                 <div
-                  className={`w-full h-2 rounded-full ${
+                  className={`w-full h-1.5 sm:h-2 rounded-full transition-all duration-500 ${
                     status.progress_percent >= stage.progress
-                      ? 'bg-success'
+                      ? 'bg-gradient-to-r from-success via-primary to-success bg-size-200 animate-gradient shadow-glow'
                       : 'bg-code-bg'
                   }`}
                 />
-                <p className="text-xs text-foreground-dim mt-2">{stage.label}</p>
-              </div>
+                <p className={`text-xs sm:text-sm mt-1 sm:mt-2 transition-all duration-300 ${
+                  status.progress_percent >= stage.progress
+                    ? 'text-foreground font-semibold'
+                    : 'text-foreground-dim'
+                }`}>
+                  {stage.label}
+                </p>
+              </motion.div>
             ))}
           </div>
         </motion.div>
 
-        {/* Info Text */}
-        <motion.p
+        {/* Info Text with Glass Effect */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="text-center text-sm text-foreground-dim mt-8"
+          className="text-center text-xs sm:text-sm text-foreground-dim mt-6 sm:mt-8 glass-card rounded-lg p-3 sm:p-4"
         >
-          Running OptiMUS pipeline: parameter extraction → mathematical formulation
-          → code generation → solver execution → results evaluation
-        </motion.p>
+          <span className="text-foreground">Opti</span>
+          <span className="text-primary italic">MATE</span>
+          <span className="text-foreground"> is analyzing your problem, generating mathematical formulations,
+          and finding the optimal solution with baseline comparison.</span>
+        </motion.div>
       </div>
     </div>
   );

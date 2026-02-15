@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ThemeToggle } from './ThemeToggle';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -16,13 +17,17 @@ export default function Navbar() {
             className="flex items-center space-x-2 group"
           >
             <div className="text-2xl group-hover:scale-110 transition-transform">✨</div>
-            <span className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-              Optima
+            <span className="text-xl font-bold group-hover:scale-105 transition-transform">
+              <span className="text-foreground">Opti</span>
+              <span className="text-primary italic">MATE</span>
             </span>
           </Link>
 
           {/* Navigation Items */}
           <div className="flex items-center space-x-4">
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
             {/* Show "New Problem" button when not on landing or refine page */}
             {pathname !== '/' && pathname !== '/refine' && (
               <Link

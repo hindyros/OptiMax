@@ -1,0 +1,8 @@
+department,beds_available,staff_count,daily_cost_per_bed,patient_demand,priority_level
+Emergency,50,25,800,60,1
+ICU,30,40,1500,25,1
+General_Ward,100,35,400,120,2
+Maternity,40,20,600,35,2
+Pediatrics,35,18,500,40,2
+Surgery,25,30,1200,20,1
+Oncology,20,22,1000,18,1
