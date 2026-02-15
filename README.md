@@ -218,13 +218,15 @@ Written to `current_query/optimind_output/`:
 
 ## Judge
 
-Compares solutions from OptiMUS and OptiMind, picks a winner, and generates a professional natural-language explanation.
+Compares solutions from OptiMUS and OptiMind, picks the best one, and generates a professional natural-language explanation.
 
-### How it Works
+### Decision Pipeline
 
-1. **Programmatic Triage** -- Checks which solvers produced output. If only one ran, it is evaluated solo.
-2. **LLM Comparison** -- GPT-4o evaluates both solutions on execution success, formulation quality, code correctness, and objective value.
-3. **NL Explanation** -- A second LLM call generates a consultant-style executive summary and technical appendix.
+1. **Data loading** -- Reads each solver's output and classifies execution status (`optimal`, `error`, `infeasible`, `unbounded`, etc.). Strips Gurobi noise (license banners, presolve stats) so the LLM sees only meaningful output.
+2. **Programmatic fast-path** -- Clear-cut cases are resolved without an LLM call: if one solver crashed and the other succeeded, the working one wins immediately.
+3. **LLM comparison** -- For ambiguous cases (both ran, or both failed), GPT-4o evaluates formulation correctness, implementation fidelity, and objective value.
+4. **Sanity override** -- If the LLM contradicts programmatic evidence (e.g., picks a crashed solver), the decision is overridden.
+5. **Explanation generation** -- A second LLM call produces an executive summary and technical appendix for the winning solution.
 
 ### Options
 
@@ -270,4 +272,4 @@ Written to `current_query/final_output/`:
 }
 ```
 
-**Solver status values:** `"success"` (ran and produced objective value), `"executed"` (ran but no numeric result), `"not_available"` (no output found).
+**Solver status values:** `"success"` (optimal or feasible with numeric objective), `"error"` (code crashed), `"infeasible"`, `"unbounded"`, `"no_result"` (ran but no numeric objective), `"not_available"` (no output found).

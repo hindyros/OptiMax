@@ -2,6 +2,13 @@
 LLM Judge -- compares OptiMUS and OptiMind solutions, picks a winner,
 and generates a professional natural-language explanation.
 
+Decision pipeline:
+    1. Load & classify each solver's output (optimal / error / infeasible / none)
+    2. Programmatic fast-path for clear-cut cases (one solver missing or crashed)
+    3. LLM evaluation for ambiguous cases (both ran, need formulation review)
+    4. Sanity-check override (LLM can't pick a crashed solver over a working one)
+    5. Generate natural-language explanation of the winning solution
+
 CLI usage:
     python judge.py                        # compare solutions in current_query/
     python judge.py --dir current_query    # explicit directory
@@ -12,6 +19,7 @@ Programmatic usage:
 """
 
 import os
+import re
 import json
 import argparse
 
@@ -20,169 +28,384 @@ from optimus_pipeline.optimus_utils import get_response
 JUDGE_MODEL = "gpt-4o"
 FINAL_OUTPUT_DIR = "final_output"
 
-# ---------------------------------------------------------------------------
-# Data loaders
-# ---------------------------------------------------------------------------
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Data loading
+# ═══════════════════════════════════════════════════════════════════════════
+
 
 def _read_file(path):
-    """Read a file and return its contents, or None if it doesn't exist."""
+    """Read a text file; return stripped contents or None if missing/empty."""
     if not os.path.isfile(path):
         return None
     with open(path, "r") as f:
-        return f.read().strip()
+        text = f.read().strip()
+    return text or None
 
 
 def _read_json(path):
-    """Read a JSON file and return the parsed dict, or None if missing."""
+    """Read a JSON file; return parsed dict or None."""
     text = _read_file(path)
     if text is None:
         return None
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+def _parse_objective(raw):
+    """Try to parse a numeric objective value from a string."""
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return None
+
+
+def _detect_direction(code):
+    """Detect maximize/minimize from solver code. Returns str or None."""
+    if not code:
+        return None
+    upper = code.upper()
+    if "MAXIMIZE" in upper or "GRB.MAXIMIZE" in upper:
+        return "maximize"
+    if "MINIMIZE" in upper or "GRB.MINIMIZE" in upper:
+        return "minimize"
+    return None
+
+
+def _classify_execution(code_output, objective_value):
+    """
+    Classify solver execution into a status string.
+
+    Returns one of:
+        "optimal"     - Gurobi found proven optimal, numeric objective available
+        "feasible"    - Code ran, numeric objective available (not necessarily proven optimal)
+        "infeasible"  - Gurobi reported model infeasible
+        "unbounded"   - Gurobi reported model unbounded
+        "error"       - Code crashed (traceback or execution failure)
+        "no_result"   - Code ran but no numeric objective
+        "not_run"     - No code_output at all
+    """
+    if code_output is None:
+        return "not_run"
+
+    if "Traceback" in code_output or "Execution failed" in code_output:
+        return "error"
+
+    upper = code_output.upper()
+    if "INFEASIBLE" in upper and "OPTIMAL" not in upper:
+        return "infeasible"
+    if "UNBOUNDED" in upper and "OPTIMAL" not in upper:
+        return "unbounded"
+
+    if objective_value is not None:
+        if "OPTIMAL" in upper:
+            return "optimal"
+        return "feasible"
+
+    return "no_result"
+
+
+def _trim_gurobi_output(code_output, max_lines=15):
+    """
+    Strip Gurobi license banner, statistics tables, and presolve noise.
+    Keep only the meaningful result lines for the LLM judge.
+    """
+    if not code_output:
+        return code_output
+
+    skip_patterns = [
+        "Set parameter",
+        "Academic license",
+        "Gurobi Optimizer version",
+        "CPU model:",
+        "Thread count",
+        "Model fingerprint",
+        "Coefficient statistics",
+        "  Matrix range",
+        "  Objective range",
+        "  Bounds range",
+        "  RHS range",
+        "Presolve removed",
+        "Presolve time",
+        "Presolved:",
+        "Variable types:",
+        "Root relaxation:",
+        "Explored ",
+        "Thread count was",
+        "Iteration ",
+        "    Nodes",
+        " Expl Unexpl",
+        "Found heuristic",
+    ]
+
+    lines = code_output.strip().splitlines()
+    kept = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("*"):  # Gurobi node table entries
+            continue
+        if any(stripped.startswith(p) for p in skip_patterns):
+            continue
+        # Skip the Gurobi tabular output (columns of numbers with |)
+        if "|" in stripped and re.match(r"^\s*\d", stripped):
+            continue
+        kept.append(line)
+
+    if not kept:
+        # Everything was noise; fall back to last few lines of original
+        kept = lines[-5:]
+
+    return "\n".join(kept[-max_lines:])
+
+
+# ---------------------------------------------------------------------------
+# Loader functions
+# ---------------------------------------------------------------------------
 
 
 def load_problem(problem_dir):
     """Load the original problem description and parameters."""
     model_dir = os.path.join(problem_dir, "model_input")
-    desc = _read_file(os.path.join(model_dir, "desc.txt"))
-    params = _read_json(os.path.join(model_dir, "params.json"))
-    return {"description": desc, "parameters": params}
+    return {
+        "description": _read_file(os.path.join(model_dir, "desc.txt")),
+        "parameters": _read_json(os.path.join(model_dir, "params.json")),
+    }
+
+
+def _load_solver(out_dir, code_filename):
+    """Generic loader for a solver's output directory."""
+    if not os.path.isdir(out_dir):
+        return None
+
+    code = _read_file(os.path.join(out_dir, code_filename))
+    code_output_raw = _read_file(os.path.join(out_dir, "code_output.txt"))
+    objective_raw = _read_file(os.path.join(out_dir, "output_solution.txt"))
+    objective_value = _parse_objective(objective_raw)
+    execution_status = _classify_execution(code_output_raw, objective_value)
+
+    return {
+        "code": code,
+        "code_output_raw": code_output_raw,
+        "code_output_clean": _trim_gurobi_output(code_output_raw),
+        "objective_value": objective_value,
+        "objective_raw": objective_raw,
+        "execution_status": execution_status,
+        "direction": _detect_direction(code),
+        "available": code is not None or code_output_raw is not None,
+    }
 
 
 def load_optimus_output(problem_dir):
-    """Load OptiMUS solver output. Returns a dict with available data."""
+    """Load OptiMUS solver output."""
     out_dir = os.path.join(problem_dir, "optimus_output")
-    if not os.path.isdir(out_dir):
+    data = _load_solver(out_dir, "code.py")
+    if data is None:
         return None
 
+    # OptiMUS also has structured state with formulation details
     state = _read_json(os.path.join(out_dir, "state_6_code.json"))
-    code = _read_file(os.path.join(out_dir, "code.py"))
-    code_output = _read_file(os.path.join(out_dir, "code_output.txt"))
-    objective_value = _read_file(os.path.join(out_dir, "output_solution.txt"))
-
-    # Try to parse objective as a number
-    obj_numeric = None
-    if objective_value:
-        try:
-            obj_numeric = float(objective_value)
-        except ValueError:
-            pass
-
-    return {
-        "solver": "optimus",
-        "state": state,
-        "code": code,
-        "code_output": code_output,
-        "objective_value": obj_numeric,
-        "objective_raw": objective_value,
-        "available": state is not None or code is not None,
-    }
+    data["solver"] = "optimus"
+    data["state"] = state
+    return data
 
 
 def load_optimind_output(problem_dir):
-    """
-    Load OptiMind solver output. Returns a dict with available data.
-
-    The exact file names and format may evolve as OptiMind's execution
-    pipeline is finalized. This loader reads whatever is available.
-    """
+    """Load OptiMind solver output."""
     out_dir = os.path.join(problem_dir, "optimind_output")
-    if not os.path.isdir(out_dir):
+    data = _load_solver(out_dir, "optimind_code.py")
+    if data is None:
         return None
 
+    # OptiMind also has the full model reasoning response
     response = _read_file(os.path.join(out_dir, "optimind_response.txt"))
-    code = _read_file(os.path.join(out_dir, "optimind_code.py"))
-    code_output = _read_file(os.path.join(out_dir, "code_output.txt"))
-    objective_value = _read_file(os.path.join(out_dir, "output_solution.txt"))
-
-    # Try to parse objective as a number
-    obj_numeric = None
-    if objective_value:
-        try:
-            obj_numeric = float(objective_value)
-        except ValueError:
-            pass
-
-    return {
-        "solver": "optimind",
-        "response": response,
-        "code": code,
-        "code_output": code_output,
-        "objective_value": obj_numeric,
-        "objective_raw": objective_value,
-        "available": response is not None or code is not None,
-    }
+    data["solver"] = "optimind"
+    data["response"] = response
+    return data
 
 
-# ---------------------------------------------------------------------------
-# Formatting helpers
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════
+# Prompt formatting
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+_STATUS_LABELS = {
+    "optimal": "OPTIMAL (proven optimal solution found)",
+    "feasible": "FEASIBLE (solution found, optimality not proven)",
+    "infeasible": "INFEASIBLE (no feasible solution exists)",
+    "unbounded": "UNBOUNDED (objective is unbounded)",
+    "error": "ERROR (code crashed during execution)",
+    "no_result": "EXECUTED (code ran but produced no numeric result)",
+    "not_run": "NOT RUN",
+}
+
 
 def _format_optimus_for_judge(optimus):
-    """Build a text summary of the OptiMUS solution for the judge prompt."""
-    if not optimus or not optimus["available"]:
-        return "OptiMUS: No output available."
+    """Build a clean summary of the OptiMUS solution for the judge prompt."""
+    if not optimus or not optimus.get("available"):
+        return "OptiMUS: No output available.\n"
 
     parts = ["=== OptiMUS Solution ==="]
+    parts.append(f"Execution status: {_STATUS_LABELS.get(optimus['execution_status'], optimus['execution_status'])}")
+
+    if optimus.get("objective_value") is not None:
+        parts.append(f"Objective value: {optimus['objective_value']}")
 
     state = optimus.get("state")
     if state:
-        # Objective
         obj = state.get("objective", {})
         parts.append(f"\nObjective: {obj.get('description', 'N/A')}")
         parts.append(f"Formulation: {obj.get('formulation', 'N/A')}")
-        parts.append(f"Code: {obj.get('code', 'N/A')}")
 
-        # Constraints
         constraints = state.get("constraints", [])
-        parts.append(f"\nConstraints ({len(constraints)}):")
-        for i, c in enumerate(constraints, 1):
-            parts.append(f"  {i}. {c.get('description', 'N/A')}")
-            parts.append(f"     Formulation: {c.get('formulation', 'N/A')}")
-            parts.append(f"     Code: {c.get('code', 'N/A')}")
+        if constraints:
+            parts.append(f"\nConstraints ({len(constraints)}):")
+            for i, c in enumerate(constraints, 1):
+                parts.append(f"  {i}. {c.get('description', 'N/A')}")
+                parts.append(f"     Formulation: {c.get('formulation', 'N/A')}")
 
-        # Variables
         variables = state.get("variables", {})
-        parts.append(f"\nVariables ({len(variables)}):")
-        for name, info in variables.items():
-            parts.append(f"  {name}: {info.get('definition', 'N/A')} (type: {info.get('type', 'N/A')})")
+        if variables:
+            parts.append(f"\nVariables ({len(variables)}):")
+            for name, info in variables.items():
+                parts.append(f"  {name}: {info.get('definition', 'N/A')} ({info.get('type', 'N/A')})")
 
     if optimus.get("code"):
-        parts.append(f"\nGenerated Code:\n{optimus['code']}")
+        parts.append(f"\nGenerated Code:\n```python\n{optimus['code']}\n```")
 
-    if optimus.get("objective_value") is not None:
-        parts.append(f"\nObjective Value: {optimus['objective_value']}")
-    elif optimus.get("code_output"):
-        parts.append(f"\nExecution Output:\n{optimus['code_output']}")
+    if optimus.get("code_output_clean"):
+        parts.append(f"\nExecution Output:\n{optimus['code_output_clean']}")
 
     return "\n".join(parts)
 
 
 def _format_optimind_for_judge(optimind):
-    """Build a text summary of the OptiMind solution for the judge prompt."""
-    if not optimind or not optimind["available"]:
-        return "OptiMind: No output available."
+    """Build a clean summary of the OptiMind solution for the judge prompt."""
+    if not optimind or not optimind.get("available"):
+        return "OptiMind: No output available.\n"
 
     parts = ["=== OptiMind Solution ==="]
-
-    if optimind.get("response"):
-        parts.append(f"\nModel Response (reasoning + formulation):\n{optimind['response']}")
-
-    if optimind.get("code"):
-        parts.append(f"\nGenerated Code:\n{optimind['code']}")
+    parts.append(f"Execution status: {_STATUS_LABELS.get(optimind['execution_status'], optimind['execution_status'])}")
 
     if optimind.get("objective_value") is not None:
-        parts.append(f"\nObjective Value: {optimind['objective_value']}")
-    elif optimind.get("code_output"):
-        parts.append(f"\nExecution Output:\n{optimind['code_output']}")
+        parts.append(f"Objective value: {optimind['objective_value']}")
+
+    # Show reasoning/formulation from the model response (but not the code
+    # block, since we show the extracted code separately below)
+    response = optimind.get("response")
+    if response:
+        # Strip code fences from the response to avoid duplication
+        reasoning = re.split(r"```(?:python)?", response)[0].strip()
+        if reasoning:
+            parts.append(f"\nModel Reasoning & Formulation:\n{reasoning}")
+
+    if optimind.get("code"):
+        parts.append(f"\nGenerated Code:\n```python\n{optimind['code']}\n```")
+
+    if optimind.get("code_output_clean"):
+        parts.append(f"\nExecution Output:\n{optimind['code_output_clean']}")
 
     return "\n".join(parts)
 
 
-# ---------------------------------------------------------------------------
-# LLM calls
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════
+# Decision logic
+# ═══════════════════════════════════════════════════════════════════════════
 
-COMPARISON_PROMPT = """You are an expert in mathematical optimization and operations research (linear programming, mixed-integer programming, constraint formulation). You routinely review optimization models for correctness, strength of formulation, and implementation fidelity. Your role is to act as a rigorous judge comparing two automated solvers' outputs for the same problem.
+
+def _programmatic_winner(optimus, optimind):
+    """
+    Determine winner from objective facts, without calling the LLM.
+
+    Returns (winner_name, reason) if the decision is clear-cut,
+    or (None, reason) if the LLM is needed.
+    """
+    opt_ok = optimus and optimus.get("available")
+    mind_ok = optimind and optimind.get("available")
+
+    # --- Neither available ---
+    if not opt_ok and not mind_ok:
+        return None, "neither solver produced output"
+
+    opt_status = optimus["execution_status"] if opt_ok else "not_run"
+    mind_status = optimind["execution_status"] if mind_ok else "not_run"
+
+    # --- Only one produced output ---
+    if not mind_ok:
+        return "optimus", "only OptiMUS produced output"
+    if not opt_ok:
+        return "optimind", "only OptiMind produced output"
+
+    # --- One succeeded, one failed ---
+    success_statuses = {"optimal", "feasible"}
+    fail_statuses = {"error", "infeasible", "unbounded", "not_run", "no_result"}
+
+    opt_success = opt_status in success_statuses
+    mind_success = mind_status in success_statuses
+
+    if opt_success and not mind_success:
+        return "optimus", f"OptiMUS succeeded ({opt_status}), OptiMind failed ({mind_status})"
+    if mind_success and not opt_success:
+        return "optimind", f"OptiMind succeeded ({mind_status}), OptiMUS failed ({opt_status})"
+
+    # --- Both failed ---
+    if not opt_success and not mind_success:
+        return None, f"both solvers failed (OptiMUS: {opt_status}, OptiMind: {mind_status})"
+
+    # --- Both succeeded: compare objectives ---
+    opt_val = optimus.get("objective_value")
+    mind_val = optimind.get("objective_value")
+
+    if opt_val is not None and mind_val is not None and opt_val == mind_val:
+        return None, f"both achieved same objective ({opt_val}); LLM to evaluate formulation quality"
+
+    # Both succeeded with different objectives -- LLM must verify correctness
+    # before we trust the objective comparison
+    return None, "both succeeded with output; LLM to evaluate correctness and compare"
+
+
+def _sanity_check(llm_winner, optimus, optimind):
+    """
+    Override the LLM's pick if it contradicts clear programmatic evidence.
+
+    Returns (final_winner, was_overridden, override_reason).
+    """
+    opt_ok = optimus and optimus.get("available")
+    mind_ok = optimind and optimind.get("available")
+    opt_status = optimus.get("execution_status") if opt_ok else "not_run"
+    mind_status = optimind.get("execution_status") if mind_ok else "not_run"
+
+    success = {"optimal", "feasible"}
+
+    # LLM picked a solver that crashed, but the other succeeded
+    if llm_winner == "optimus" and opt_status not in success and mind_status in success:
+        return "optimind", True, f"LLM picked OptiMUS ({opt_status}) but OptiMind succeeded ({mind_status})"
+    if llm_winner == "optimind" and mind_status not in success and opt_status in success:
+        return "optimus", True, f"LLM picked OptiMind ({mind_status}) but OptiMUS succeeded ({opt_status})"
+
+    # LLM picked a solver with no output
+    if llm_winner == "optimus" and not opt_ok and mind_ok:
+        return "optimind", True, "LLM picked OptiMUS but it has no output"
+    if llm_winner == "optimind" and not mind_ok and opt_ok:
+        return "optimus", True, "LLM picked OptiMind but it has no output"
+
+    return llm_winner, False, None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LLM prompts
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+COMPARISON_PROMPT = """\
+You are an expert in mathematical optimization and operations research. \
+Your role is to act as a rigorous judge comparing two automated solvers' \
+outputs for the same optimization problem.
 
 ## Original Problem
 
@@ -192,49 +415,54 @@ COMPARISON_PROMPT = """You are an expert in mathematical optimization and operat
 
 {optimus_summary}
 
+---
+
 {optimind_summary}
 
 ## Evaluation Criteria (apply in order; later criteria break ties)
 
-1. **Solvability & execution**  
-   Did the code run to completion and return a result (optimal, feasible, or a clear status)? A solver that crashes or fails to execute cannot win unless it is the only one with output.
+1. **Execution success** — Did the code run and produce a result? A solver \
+that crashes or returns INFEASIBLE/UNBOUNDED (when the problem is feasible) \
+cannot win unless the other also failed.
 
-2. **Formulation correctness**  
-   - **Objective**: Does the stated objective (maximize/minimize and expression) match the problem description? Is the direction (max vs min) correct?  
-   - **Constraints**: Are all material constraints from the problem captured? Are inequalities/equalities and right-hand sides consistent with the problem (no flipped signs, no missing or spurious constraints)?  
-   - **Variables**: Are variable types appropriate (continuous vs integer vs binary) and dimensions/shapes consistent with the problem (e.g., correct indexing over products, time periods, resources)?
+2. **Formulation correctness** — Is the objective correct (right direction, \
+right expression)? Are all constraints from the problem captured with correct \
+signs, bounds, and variable types?
 
-3. **Implementation fidelity**  
-   Does the generated code correctly implement the stated formulation? Check for: wrong indices or loop bounds, transposed or misplaced coefficients, incorrect constraint sense (≤ vs ≥ vs =), and that the solver is invoked and the objective value is reported correctly.
+3. **Implementation fidelity** — Does the code correctly implement the stated \
+formulation? Check indices, coefficients, constraint sense (≤ vs ≥ vs =), \
+and that the solver is invoked properly.
 
-4. **Feasibility & optimality**  
-   If the formulation and code are correct, does the solution satisfy the constraints and yield a valid objective value? If both solvers are correct, which achieves a strictly better objective value given the problem direction (higher for maximize, lower for minimize)?
+4. **Objective value** — If both are correct and executed, which achieves a \
+strictly better objective (higher for maximize, lower for minimize)?
 
-If only one solver produced output, evaluate that solver on criteria 2–4 only; it wins by default on execution but must still be assessed for formulation and implementation quality.
+If only one solver produced output, evaluate it on criteria 2–4 and it wins \
+by default on execution.
 
-Respond with a JSON object (and nothing else) in this exact format:
+Respond with a JSON object **and nothing else**:
 {{
     "winner": "optimus" or "optimind",
     "direction": "maximize" or "minimize",
-    "reasoning": "2-4 sentence explanation, using optimization terminology, of why this solver was chosen (cite specific formulation or implementation strengths/weaknesses)",
-    "optimus_assessment": "1-2 sentence assessment of OptiMUS's formulation and execution",
-    "optimind_assessment": "1-2 sentence assessment of OptiMind's formulation and execution"
-}}
-"""
+    "reasoning": "2-4 sentences: why this solver won, citing specific formulation or implementation strengths/weaknesses",
+    "optimus_assessment": "1-2 sentence assessment of OptiMUS",
+    "optimind_assessment": "1-2 sentence assessment of OptiMind"
+}}"""
 
-EXPLANATION_PROMPT = """You are a senior consultant with deep expertise in optimization and operations research, presenting results to a mixed audience. In Part 1 you speak to executives; in Part 2 you speak to technical stakeholders with correct optimization terminology and notation.
+
+EXPLANATION_PROMPT = """\
+You are a senior optimization consultant presenting results to a mixed \
+audience. In Part 1 you speak to executives; in Part 2 you speak to \
+technical stakeholders.
 
 ## The Problem
 
 {problem_description}
 
-## The Winning Solution
+## The Winning Solution ({winner_name})
 
 {winner_details}
 
 ## Your Task
-
-Write a two-part response:
 
 **PART 1 — EXECUTIVE SUMMARY**
 
@@ -244,18 +472,51 @@ Write a clear, jargon-free explanation of:
 - What the expected outcome is (the objective value, in business terms)
 - Any key trade-offs or considerations
 
-Write this as if advising a CEO. No math, no code. Use concrete language ("produce 40 units" not "set x_A = 40").
+No math, no code. Use concrete language ("produce 40 units" not "set x_A = 40").
 
 **PART 2 — TECHNICAL APPENDIX**
 
-Present the mathematical and implementation details for technical stakeholders (e.g., analysts or OR practitioners):
-- The objective function in standard form (LaTeX/math notation; state maximize vs minimize)
-- All constraints in clear mathematical form (LaTeX), with a brief note on what each encodes
+Present the mathematical and implementation details:
+- The objective function in standard form (state maximize vs minimize)
+- All constraints in clear mathematical form, with a note on what each encodes
 - The generated solver code (as provided)
 - The solver output and reported optimal value
 
-Use precise optimization terminology (objective, constraints, variables, feasibility, optimal value). Separate the two parts with the line: --- TECHNICAL APPENDIX ---
-"""
+Use precise optimization terminology. Separate the two parts with:
+--- TECHNICAL APPENDIX ---"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LLM calls
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _parse_llm_json(response_text):
+    """Robustly parse JSON from LLM output, handling markdown fences."""
+    text = response_text.strip()
+
+    # Strip markdown code fences
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text.rsplit("```", 1)[0]
+    text = text.strip()
+
+    # Try direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Try to find a JSON object in the text
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    return None
 
 
 def evaluate_solutions(problem, optimus, optimind, model=JUDGE_MODEL):
@@ -263,71 +524,57 @@ def evaluate_solutions(problem, optimus, optimind, model=JUDGE_MODEL):
     Call the LLM judge to compare both solutions.
     Returns the parsed comparison dict.
     """
-    optimus_summary = _format_optimus_for_judge(optimus)
-    optimind_summary = _format_optimind_for_judge(optimind)
-
     prompt = COMPARISON_PROMPT.format(
-        problem_description=problem["description"],
-        optimus_summary=optimus_summary,
-        optimind_summary=optimind_summary,
+        problem_description=problem["description"] or "(no description)",
+        optimus_summary=_format_optimus_for_judge(optimus),
+        optimind_summary=_format_optimind_for_judge(optimind),
     )
 
     response = get_response(prompt, model=model)
+    parsed = _parse_llm_json(response)
 
-    # Parse JSON from response
-    try:
-        # Handle case where LLM wraps JSON in markdown code blocks
-        text = response.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1]
-            text = text.rsplit("```", 1)[0]
-        return json.loads(text)
-    except (json.JSONDecodeError, IndexError):
-        # Fallback: return raw response as reasoning
-        return {
-            "winner": "optimus",
-            "direction": "unknown",
-            "reasoning": f"Judge response could not be parsed as JSON. Raw: {response[:500]}",
-            "optimus_assessment": "N/A",
-            "optimind_assessment": "N/A",
-        }
+    if parsed and "winner" in parsed:
+        return parsed
+
+    # Fallback: couldn't parse
+    return {
+        "winner": "optimus",
+        "direction": "unknown",
+        "reasoning": f"Judge response could not be parsed. Raw: {response[:500]}",
+        "optimus_assessment": "N/A",
+        "optimind_assessment": "N/A",
+    }
 
 
-def generate_explanation(problem, winner_data, comparison, model=JUDGE_MODEL):
+def generate_explanation(problem, winner_data, winner_name, model=JUDGE_MODEL):
     """
-    Generate a professional natural-language explanation of the winning solution.
-    Returns a dict with 'summary' and 'technical' fields.
+    Generate a professional NL explanation of the winning solution.
+    Returns dict with 'summary' and 'technical' fields.
     """
-    winner_name = comparison.get("winner", "optimus")
-
     if winner_name == "optimus":
         winner_details = _format_optimus_for_judge(winner_data)
     else:
         winner_details = _format_optimind_for_judge(winner_data)
 
     prompt = EXPLANATION_PROMPT.format(
-        problem_description=problem["description"],
+        problem_description=problem["description"] or "(no description)",
+        winner_name=winner_name.upper(),
         winner_details=winner_details,
     )
 
     response = get_response(prompt, model=model)
 
-    # Split into summary and technical sections
     separator = "--- TECHNICAL APPENDIX ---"
     if separator in response:
         parts = response.split(separator, 1)
-        summary = parts[0].strip()
-        technical = parts[1].strip()
-    else:
-        summary = response.strip()
-        technical = ""
-
-    return {"summary": summary, "technical": technical}
+        return {"summary": parts[0].strip(), "technical": parts[1].strip()}
+    return {"summary": response.strip(), "technical": ""}
 
 
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════
 # Main orchestration
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════
+
 
 def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
     """
@@ -335,64 +582,96 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
     a professional explanation.
 
     Writes results to {problem_dir}/final_output/:
-        - verdict.json   — structured result for the frontend
-        - explanation.txt — full NL explanation
+        - verdict.json   -- structured result for the frontend
+        - explanation.txt -- full NL explanation
 
     Returns the verdict dict.
     """
-    # Load everything
+    # ── Load ──
     problem = load_problem(problem_dir)
     optimus = load_optimus_output(problem_dir)
     optimind = load_optimind_output(problem_dir)
 
     if not problem["description"]:
-        raise FileNotFoundError(f"No problem description found at {problem_dir}/model_input/desc.txt")
+        raise FileNotFoundError(
+            f"No problem description at {problem_dir}/model_input/desc.txt"
+        )
 
-    optimus_available = optimus and optimus["available"]
-    optimind_available = optimind and optimind["available"]
+    opt_ok = optimus and optimus.get("available")
+    mind_ok = optimind and optimind.get("available")
 
-    if not optimus_available and not optimind_available:
+    if not opt_ok and not mind_ok:
         raise RuntimeError("Neither solver produced output. Nothing to judge.")
 
-    # --- Layer 1: Programmatic triage ---
-    # If only one solver has output, it wins by default but we still
-    # evaluate its quality and generate the explanation.
-    if not optimind_available:
-        print("[judge] Only OptiMUS output available. Evaluating OptiMUS solution.")
-    elif not optimus_available:
-        print("[judge] Only OptiMind output available. Evaluating OptiMind solution.")
-    else:
-        print("[judge] Both solvers produced output. Comparing solutions.")
+    # ── Layer 1: Programmatic fast-path ──
+    prog_winner, prog_reason = _programmatic_winner(optimus, optimind)
 
-    # --- Layer 2: LLM comparison ---
-    print("[judge] Calling LLM judge for evaluation...")
-    comparison = evaluate_solutions(problem, optimus, optimind, model=model)
-    winner_name = comparison.get("winner", "optimus")
+    if prog_winner:
+        print(f"[judge] Programmatic winner: {prog_winner} ({prog_reason})")
+        winner_name = prog_winner
+        # Still call LLM for quality assessment and explanation
+        print("[judge] Calling LLM for quality assessment...")
+        comparison = evaluate_solutions(problem, optimus, optimind, model=model)
+        # Override LLM's winner with our programmatic decision
+        comparison["winner"] = prog_winner
+        comparison["programmatic_reason"] = prog_reason
+    else:
+        # ── Layer 2: LLM comparison ──
+        print(f"[judge] Both solvers have output. {prog_reason}")
+        print("[judge] Calling LLM judge for comparison...")
+        comparison = evaluate_solutions(problem, optimus, optimind, model=model)
+        winner_name = comparison.get("winner", "optimus")
+
+        # ── Layer 3: Sanity check ──
+        winner_name, overridden, override_reason = _sanity_check(
+            winner_name, optimus, optimind
+        )
+        if overridden:
+            print(f"[judge] OVERRIDE: {override_reason}")
+            comparison["winner"] = winner_name
+            comparison["override_reason"] = override_reason
+
     print(f"[judge] Winner: {winner_name}")
 
-    # --- Layer 3: NL explanation ---
+    # ── Generate explanation ──
     print("[judge] Generating professional explanation...")
     winner_data = optimus if winner_name == "optimus" else optimind
-    explanation = generate_explanation(problem, winner_data, comparison, model=model)
+    explanation = generate_explanation(
+        problem, winner_data, winner_name, model=model
+    )
     print("[judge] Explanation generated.")
 
-    # --- Build verdict ---
+    # ── Detect direction ──
+    direction = comparison.get("direction", "unknown")
+    if direction == "unknown":
+        # Try to detect from code
+        for solver in (optimus, optimind):
+            if solver and solver.get("direction"):
+                direction = solver["direction"]
+                break
+
+    # ── Build verdict ──
+    def _solver_status(solver):
+        if not solver or not solver.get("available"):
+            return "not_available"
+        s = solver.get("execution_status", "not_run")
+        if s in ("optimal", "feasible"):
+            return "success"
+        return s  # error, infeasible, unbounded, no_result, not_run
+
     verdict = {
         "winner": winner_name,
         "objective_value": (
-            optimus.get("objective_value") if winner_name == "optimus"
-            else (optimind.get("objective_value") if optimind else None)
+            winner_data.get("objective_value") if winner_data else None
         ),
-        "direction": comparison.get("direction", "unknown"),
+        "direction": direction,
         "solvers": {
             "optimus": {
-                "status": "success" if optimus_available and optimus.get("objective_value") is not None else
-                          "executed" if optimus_available else "not_available",
+                "status": _solver_status(optimus),
                 "objective_value": optimus.get("objective_value") if optimus else None,
             },
             "optimind": {
-                "status": "success" if optimind_available and optimind.get("objective_value") is not None else
-                          "executed" if optimind_available else "not_available",
+                "status": _solver_status(optimind),
                 "objective_value": optimind.get("objective_value") if optimind else None,
             },
         },
@@ -403,7 +682,7 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
         "technical_details": explanation["technical"],
     }
 
-    # --- Write output ---
+    # ── Write output ──
     output_dir = os.path.join(problem_dir, FINAL_OUTPUT_DIR)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -412,35 +691,44 @@ def compare_solutions(problem_dir="current_query", model=JUDGE_MODEL):
         json.dump(verdict, f, indent=2)
     print(f"[judge] Verdict written to {verdict_path}")
 
-    explanation_path = os.path.join(output_dir, "explanation.txt")
-    full_explanation = explanation["summary"]
+    explanation_text = explanation["summary"]
     if explanation["technical"]:
-        full_explanation += "\n\n--- TECHNICAL APPENDIX ---\n\n" + explanation["technical"]
+        explanation_text += "\n\n--- TECHNICAL APPENDIX ---\n\n" + explanation["technical"]
+    explanation_path = os.path.join(output_dir, "explanation.txt")
     with open(explanation_path, "w") as f:
-        f.write(full_explanation)
+        f.write(explanation_text)
     print(f"[judge] Explanation written to {explanation_path}")
 
     return verdict
 
 
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════
 # CLI
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Compare OptiMUS and OptiMind solutions, pick a winner"
     )
-    parser.add_argument("--dir", type=str, default="current_query",
-                        help="Problem directory (default: current_query)")
-    parser.add_argument("--model", type=str, default=JUDGE_MODEL,
-                        help=f"LLM model for judging (default: {JUDGE_MODEL})")
+    parser.add_argument(
+        "--dir", type=str, default="current_query",
+        help="Problem directory (default: current_query)",
+    )
+    parser.add_argument(
+        "--model", type=str, default=JUDGE_MODEL,
+        help=f"LLM model for judging (default: {JUDGE_MODEL})",
+    )
     args = parser.parse_args()
 
     verdict = compare_solutions(problem_dir=args.dir, model=args.model)
 
-    print(f"\n{'='*60}")
-    print(f"  Winner: {verdict['winner'].upper()}")
+    print(f"\n{'=' * 60}")
+    print(f"  Winner:    {verdict['winner'].upper()}")
     print(f"  Objective: {verdict['objective_value']}")
+    print(f"  Direction: {verdict['direction']}")
+    print(f"  OptiMUS:   {verdict['solvers']['optimus']['status']} "
+          f"(obj={verdict['solvers']['optimus']['objective_value']})")
+    print(f"  OptiMind:  {verdict['solvers']['optimind']['status']} "
+          f"(obj={verdict['solvers']['optimind']['objective_value']})")
     print(f"  Reasoning: {verdict['reasoning']}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
