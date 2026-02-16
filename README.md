@@ -1,6 +1,6 @@
 # OptiMATE
 
-An ensemble natural-language optimization solver that runs **OptiMUS** and **OptiMind** in parallel, uses an LLM judge to pick the best solution, and generates a professional consultant-grade report.
+An ensemble natural-language optimization solver that runs **OptiMUS** and **OptiMind** in parallel, uses an LLM judge to pick the best solution, and generates a professional consultant-grade optimization report.
 
 Built for **TreeHacks 2026**, with credit to the original creators of [OptiMUS](https://github.com/teshnizi/OptiMUS) and [OptiMind](https://arxiv.org/abs/2509.22979).
 
